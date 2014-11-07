@@ -7,7 +7,7 @@ the NIPS 2014 workshop on machine learning in computational biology.
 
 #+BEGIN_SRC R
 install.packages("devtools")
-install_github("tdhock/PeakSegDP")
+devtools::install_github("tdhock/PeakSegDP")
 library(PeakSegDP)
 example(PeakSegDP)
 #+END_SRC
