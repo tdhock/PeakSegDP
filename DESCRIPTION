@@ -1,0 +1,12 @@
+Package: PeakSegDP
+Maintainer: Toby Dylan Hocking <toby.hocking@mail.mcgill.ca>
+Author: Toby Dylan Hocking, Guillem Rigaill
+Version: 2014.11.7
+License: GPL-3
+Title: Peak detection via constrained optimal Segmentation
+Description: A dynamic programming algorithm can be used to compute the
+ best segmentation with respect to the Poisson likelihood, subject
+ to a constraint on the number of segments, and the changes which must
+ alternate: up, down, up, down, ...
+Suggests: ggplot2, testthat, proto, PeakError
+Depends: R (>= 2.10)
