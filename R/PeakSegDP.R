@@ -115,11 +115,12 @@ PeakSegDP <- structure(function
   segment.ends <- getPath(fit)
   results <- list()
   for(peaks in 0:maxPeaks){
+    peak.list <- list()
     segments <- as.integer(peaks*2 + 1)
     model.i <- peaks * 2 + 1
-    last.i <- segment.ends[model.i, 1:model.i]
+    last.i <- as.integer(segment.ends[model.i, 1:model.i])
     break.after <- last.i[-model.i]
-    first.i <- c(1, break.after+1)
+    first.i <- as.integer(c(1, break.after+1))
     model.error <- 0
     if(length(break.after)){
       results$breaks[[paste(peaks)]] <-
@@ -127,26 +128,37 @@ PeakSegDP <- structure(function
                    chromEnd=compressed$chromEnd[break.after])
     }
     for(segment.i in seq_along(last.i)){
-      from <- first.i[[segment.i]]
-      to <- last.i[[segment.i]]
-      seg.data <- compressed[from:to,]
+      status <- ifelse(segment.i %% 2, "background", "peak")
+      first <- first.i[[segment.i]]
+      last <- last.i[[segment.i]]
+      seg.data <- compressed[first:last,]
       seg.mean <- with(seg.data, sum(count*bases)/sum(bases))
       model.error <- model.error + with(seg.data, {
         PoissonLoss(count, seg.mean, bases)
       })
+      chromStart <- seg.data$chromStart[1]
+      chromEnd <- seg.data$chromEnd[nrow(seg.data)]
       results$segments[[paste(peaks, segment.i)]] <- 
         data.frame(mean=seg.mean,
-                   first=from,
-                   last=to,
-                   chromStart=seg.data$chromStart[1],
-                   chromEnd=seg.data$chromEnd[nrow(seg.data)],
-                   status=ifelse(segment.i %% 2, "background", "peak"),
+                   first,
+                   last,
+                   chromStart,
+                   chromEnd,
+                   status,
                    peaks,
                    segments)
-    }
+      if(status == "peak"){
+        peak.list[[paste(segment.i)]] <-
+          data.frame(first, last,
+                     chromStart, chromEnd,
+                     peaks, segments)
+      }
+    }#segment.i
+    results$peaks[[as.character(peaks)]] <- do.call(rbind, peak.list)
     results$error[[as.character(peaks)]] <- 
       data.frame(segments=model.i, peaks, error=model.error)
   }
+  results$peaks <- c(list("0"=dp.fit$peaks[[1]][0,]), results$peaks)
   results$error <- do.call(rbind, results$error)
   results$segments <- do.call(rbind, results$segments)
   results$breaks <- do.call(rbind, results$breaks)
