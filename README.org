@@ -1,8 +1,8 @@
 PeakSegDP
 
 This code was used to compute the state-of-the-art peak detection
-results described in "PeakSeg: Peak detection via constrained optimal
-Segmentation," by Hocking TD, Rigaill G, and Bourque G, proceedings of
+results described in "[[https://github.com/tdhock/PeakSegDP-NIPS][PeakSeg: Peak detection via constrained optimal
+Segmentation]]," by Hocking TD, Rigaill G, and Bourque G, proceedings of
 the NIPS 2014 workshop on machine learning in computational biology.
 
 #+BEGIN_SRC R
@@ -12,3 +12,4 @@ library(PeakSegDP)
 example(PeakSegDP)
 example(largestContinuousMinimum)
 #+END_SRC
+
