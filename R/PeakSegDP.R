@@ -115,11 +115,17 @@ PeakSegDP <- structure(function
   segment.ends <- getPath(fit)
   results <- list()
   for(peaks in 0:maxPeaks){
+    segments <- as.integer(peaks*2 + 1)
     model.i <- peaks * 2 + 1
     last.i <- segment.ends[model.i, 1:model.i]
     break.after <- last.i[-model.i]
     first.i <- c(1, break.after+1)
     model.error <- 0
+    if(length(break.after)){
+      results$breaks[[paste(peaks)]] <-
+        data.frame(peaks, segments, break.after,
+                   chromEnd=compressed$chromEnd[break.after])
+    }
     for(segment.i in seq_along(last.i)){
       from <- first.i[[segment.i]]
       to <- last.i[[segment.i]]
@@ -130,16 +136,20 @@ PeakSegDP <- structure(function
       })
       results$segments[[paste(peaks, segment.i)]] <- 
         data.frame(mean=seg.mean,
+                   first=from,
+                   last=to,
                    chromStart=seg.data$chromStart[1],
                    chromEnd=seg.data$chromEnd[nrow(seg.data)],
                    status=ifelse(segment.i %% 2, "background", "peak"),
-                   peaks)
+                   peaks,
+                   segments)
     }
     results$error[[as.character(peaks)]] <- 
       data.frame(segments=model.i, peaks, error=model.error)
   }
   results$error <- do.call(rbind, results$error)
   results$segments <- do.call(rbind, results$segments)
+  results$breaks <- do.call(rbind, results$breaks)
   results
 }, ex=function(){
   data(chr11ChIPseq)
