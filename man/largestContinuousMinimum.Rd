@@ -42,6 +42,7 @@ for(peaks.chr in names(peak.list)){
 ## plot the annotation error of the 6 models.
 ann.colors <- c(noPeaks = "#f6f4bf", peakStart = "#ffafaf", 
                 peakEnd = "#ff4c4c", peaks = "#a445ee")
+library(ggplot2)
 ggplot()+
   geom_tallrect(aes(xmin=chromStart/1e3, xmax=chromEnd/1e3,
                     fill=annotation),
