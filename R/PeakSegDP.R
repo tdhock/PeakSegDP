@@ -164,7 +164,11 @@ PeakSegDP <- structure(function
         data.frame(segments=model.i, peaks, error=model.error)
     }#!not.feasible
   }#peaks
-  results$peaks <- c(list("0"=results$peaks[[1]][0,]), results$peaks)
+  no.peaks <-
+    data.frame(first=integer(), last=integer(),
+               chromStart=integer(), chromEnd=integer(),
+               peaks=integer(), segments=integer())
+  results$peaks <- c(list("0"=no.peaks), results$peaks)
   results$error <- do.call(rbind, results$error)
   results$segments <- do.call(rbind, results$segments)
   results$breaks <- do.call(rbind, results$breaks)
