@@ -1,9 +1,10 @@
 PeakSegDP
 
 This code was used to compute the state-of-the-art peak detection
-results described in "[[https://github.com/tdhock/PeakSegDP-NIPS][PeakSeg: Peak detection via constrained optimal
-Segmentation]]," by Hocking TD, Rigaill G, and Bourque G, proceedings of
-the NIPS 2014 workshop on machine learning in computational biology.
+results described in the "[[https://github.com/tdhock/PeakSegDP-NIPS][PeakSeg: Peak detection via constrained optimal segmentation]]," 
+(4-page paper for NIPS 2014 workshop on machine learning in
+computational biology) and "[[https://github.com/tdhock/PeakSeg-paper][PeakSeg: constrained optimal segmentation and supervised penalty learning for peak detection in count data]]" (8-page paper)
+by Hocking TD, Rigaill G, and Bourque G.
 
 #+BEGIN_SRC R
 install.packages("devtools")
