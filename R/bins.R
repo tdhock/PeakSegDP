@@ -34,10 +34,10 @@ binSum <- structure(function
   total <- result$bin.total
   chromStart <- seq(bin.chromStart, by=bin.size, l=n.bins)
   chromEnd <- chromStart + bin.size
-  data.frame(chromStart, chromEnd, total,
+  data.frame(chromStart, chromEnd, count=total,
              mean=total/bin.size)
 ### data.frame with n.bins rows and columns chromStart, chromEnd,
-### total, mean.
+### count, mean.
 }, ex=function(){
   ## bins of size 3bp.
   ## -1-   -3-   -5-
