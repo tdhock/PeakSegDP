@@ -1,3 +1,7 @@
+2015.02.27
+
+binSum C code for quickly computing sums over bins of constant size.
+
 2014.11.10
 
 warning when user requests X peaks but that model is infeasible.
