@@ -1,3 +1,5 @@
+#include "binSum.h"
+
 int binSum
 (int *profile_chromStart, 
  int *profile_chromEnd, 
@@ -9,7 +11,7 @@ int binSum
  int bin_chromStart){
   int profile_i = 0, bin_i = 0;
   for(bin_i = 0; bin_i < n_bins; bin_i++){
-    bin_total = 0;
+    bin_total[bin_i] = 0;
   }
   // bin_chromStart gives the base before the first position that we
   // want to count, for example 1000 means we want to start counting at

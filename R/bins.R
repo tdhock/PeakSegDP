@@ -19,13 +19,14 @@ binSum <- structure(function
   stopifnot(length(bin.size) == 1)
   stopifnot(is.integer(n.bins))
   stopifnot(length(n.bins) == 1)
+  bin.total <- integer(n.bins)
   result <- 
   .C("binSum_interface",
      profile.chromStart=as.integer(compressed$chromStart),
      profile.chromEnd=as.integer(compressed$chromEnd),
      profile.coverage=as.integer(compressed$count),
      n.profiles=as.integer(nrow(compressed)),
-     bin.total=integer(n.bins),
+     bin.total=as.integer(bin.total),
      bin.size=as.integer(bin.size),
      n.bins=as.integer(n.bins),
      bin.chromStart=as.integer(bin.chromStart),
@@ -61,7 +62,8 @@ binSum <- structure(function
     geom_text(aes(position, 0, label=base),
               data=bases)+
     geom_step(aes(chromStart+0.5, count, color=what),
-              data=data.frame(profile, what="profile"))+
+              data=data.frame(profile, what="profile"),
+              size=2)+
     geom_step(aes(chromStart+0.5, total, color=what),
               data=data.frame(bins, what="bin total"))+
     geom_step(aes(chromStart+0.5, mean, color=what),

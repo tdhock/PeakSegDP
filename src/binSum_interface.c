@@ -1,3 +1,6 @@
+#include "binSum.h"
+#include <R.h>
+
 void binSum_interface(
   int *profile_chromStart,
   int *profile_chromEnd,
