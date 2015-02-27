@@ -137,7 +137,9 @@ PeakSegDP <- structure(function
         first <- first.i[[segment.i]]
         last <- last.i[[segment.i]]
         seg.data <- compressed[first:last,]
-        seg.mean <- with(seg.data, sum(count*bases)/sum(bases))
+        count.num <- as.numeric(seg.data$count)
+        bases.num <- as.numeric(seg.data$bases)
+        seg.mean <- sum(count.num*bases.num)/sum(bases.num)
         model.error <- model.error + with(seg.data, {
           PoissonLoss(count, seg.mean, bases)
         })
