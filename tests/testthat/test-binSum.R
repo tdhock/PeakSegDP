@@ -53,3 +53,28 @@ test_that("binSum 3bp with non-constant profile", {
   expect_equal(bins$mean, expected.mean)
 })
 
+test_that("binSum 3bp with non-constant profile + 1000", {
+  ## bins of size 3bp.
+  ## -1-   -3-   -5-
+  ##    -2-   -4-
+  ## 123456789012345 base index + 1000.
+  ## --2---
+  ##       --1-
+  ##           --0-------
+  ## Coverage profile.
+  profile <- data.frame(chromStart=as.integer(c(0, 1000, 1006, 1010)),
+                        chromEnd=as.integer(c(1000, 1006, 1010, 10000)),
+                        count=as.integer(c(0, 2, 1, 0)))
+  bins <- binSum(profile,
+                 bin.chromStart=1000L,
+                 bin.size=3L,
+                 n.bins=2000L)
+  expect_identical(bins$chromStart, seq(1000, by=3, l=2000))
+  expect_identical(bins$chromEnd, seq(1003, by=3, l=2000))
+  expected.total <- rep(0L, 2000)
+  expected.total[1:4] <- as.integer(c(6, 6, 3, 1))
+  expect_identical(bins$total, expected.total)
+  expected.mean <- expected.total/3
+  expect_equal(bins$mean, expected.mean)
+})
+

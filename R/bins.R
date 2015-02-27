@@ -49,6 +49,7 @@ binSum <- structure(function
   profile <- data.frame(chromStart=as.integer(c(0, 6, 10)),
                         chromEnd=as.integer(c(6, 10, 10000)),
                         count=as.integer(c(2, 1, 0)))
+  library(PeakSegDP)
   bins <- binSum(profile,
                  bin.chromStart=0L,
                  bin.size=3L,
