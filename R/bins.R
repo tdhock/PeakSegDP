@@ -33,7 +33,8 @@ binSum <- function
   total <- result$bin.total
   chromStart <- seq(bin.chromStart, by=bin.size, l=n.bins)
   chromEnd <- chromStart + bin.size
-  data.frame(chromStart, chromEnd, total)
+  data.frame(chromStart, chromEnd, total,
+             mean=total/bin.size)
 ### data.frame with n.bins rows and columns chromStart, chromEnd,
-### total.
+### total, mean.
 }
