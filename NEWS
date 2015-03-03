@@ -1,5 +1,7 @@
 2015.03.03
 
+fista.R interval regression code.
+
 binSum C code sets count to -1 for profiles that are too short for the
 number of bins requested.
 

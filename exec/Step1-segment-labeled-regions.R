@@ -180,32 +180,32 @@ for(chrom in names(regions.by.chrom)){
           param.peaks <- fit$peaks[[param.name]]
           error <- PeakErrorChrom(param.peaks, chunk.regions)
           exact[param.name, "incorrect.regions"] <-
-            exact[param.name, "incorrect.regions"] +
-              with(error, sum(fp+fn))
+            with(error, sum(fp+fn))
         }
-      }
-      limits <- with(exact, {
-        largestContinuousMinimum(incorrect.regions,
-                                 max.log.lambda-min.log.lambda)
-      })
+        limits <- with(exact, {
+          largestContinuousMinimum(incorrect.regions,
+                                   max.log.lambda-min.log.lambda)
+        })
 
-      limits.list[[paste(bases.per.bin)]][[problem.name]] <- 
-        c(exact$min.log.lambda[limits$start],
-          exact$max.log.lambda[limits$end])
+        limits.list[[paste(bases.per.bin)]][[chunk.id]][[problem.name]] <- 
+          c(exact$min.log.lambda[limits$start],
+            exact$max.log.lambda[limits$end])
 
-      result.dt <-
-        data.table(chrom,
-                   problem.name,
-                   bases.per.bin,
-                   bases.per.problem,
-                   binSum.seconds,
-                   cDPA.seconds,
-                   min.peaks=exact$peaks[limits$end],
-                   max.peaks=exact$peaks[limits$start],
-                   errors=min(exact$incorrect.regions),
-                   regions=nrow(problem.regions))
+        result.dt <-
+          data.table(chrom,
+                     problem.name,
+                     chunk.id,
+                     bases.per.bin,
+                     bases.per.problem,
+                     binSum.seconds,
+                     cDPA.seconds,
+                     min.peaks=exact$peaks[limits$end],
+                     max.peaks=exact$peaks[limits$start],
+                     errors=min(exact$incorrect.regions),
+                     regions=nrow(problem.regions))
 
-      error.list[[paste(bases.per.bin, problem.name)]] <- result.dt
+        error.list[[paste(bases.per.bin, problem.name, chunk.id)]] <- result.dt
+      }#chunk.id
     }#problem.str
   }#problem.size.i
 }#chrom
@@ -225,9 +225,14 @@ ggplot(res.errors, aes(bases.per.bin, errors))+
 
 features.limits <- list()
 for(bases.per.bin.str in names(features.list)){
+  chunk.list <- limits.list[[bases.per.bin.str]]
+  chunk.mats <- list()
+  for(chunk.id in names(chunk.list)){
+    chunk.mats[[chunk.id]] <- do.call(rbind, chunk.list[[chunk.id]])
+  }
   features.limits[[bases.per.bin.str]] <-
     list(features=do.call(rbind, features.list[[bases.per.bin.str]]),
-         limits=do.call(rbind, limits.list[[bases.per.bin.str]]))
+         limits=chunk.mats)
 }
 
 out.RData <- sub("[^.]*$", "RData", bed.path)
