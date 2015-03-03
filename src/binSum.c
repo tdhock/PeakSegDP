@@ -24,7 +24,7 @@ int binSum
   int count_until, bases, bin_add, profile_add;
   int begin_count_after = bin_chromStart;
   int bin_end = bin_chromStart + bin_size;
-  while(bin_i < n_bins){
+  while(bin_i < n_bins && profile_i < n_profiles){
     // at this point there are two cases.
     if(bin_end <= profile_chromEnd[profile_i]){
       // 1. the profile segment continues to the end of this bin,
@@ -60,6 +60,13 @@ int binSum
       bin_i++;
       bin_end += bin_size;
     }
+  }
+  while(bin_i < n_bins){
+    //printf("bin_i=%d bin_total[bin_i]=%d\n", bin_i, bin_total[bin_i]);
+    if(bin_total[bin_i] == 0){
+      bin_total[bin_i] = -1;
+    }
+    bin_i++;
   }
   return 0;
 }

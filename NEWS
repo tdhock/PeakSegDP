@@ -1,3 +1,8 @@
+2015.03.03
+
+binSum C code sets count to -1 for profiles that are too short for the
+number of bins requested.
+
 2015.02.27
 
 binSum C code for quickly computing sums over bins of constant size.
