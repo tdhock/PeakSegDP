@@ -78,3 +78,25 @@ test_that("binSum 3bp with non-constant profile + 1000", {
   expect_equal(bins$mean, expected.mean)
 })
 
+test_that("binSum returns short data.frame if coverage ends", {
+  profile <- data.frame(chromStart=as.integer(c(0, 100)),
+                        chromEnd=as.integer(c(100, 200)),
+                        count=as.integer(c(10, 5)))
+  bins <- binSum(profile,
+                 bin.chromStart=0L,
+                 bin.size=10L,
+                 n.bins=10L)
+  expect_equal(bins$mean, rep(10, 10))
+
+  bins <- binSum(profile,
+                 bin.chromStart=0L,
+                 bin.size=10L,
+                 n.bins=20L)
+  expect_equal(bins$mean, rep(c(10, 5), each=10))
+
+  bins <- binSum(profile,
+                 bin.chromStart=0L,
+                 bin.size=10L,
+                 n.bins=30L)
+  expect_equal(bins$mean, rep(c(10, 5), each=10))
+})
