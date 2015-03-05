@@ -99,7 +99,11 @@ for(chrom in names(regions.by.chrom)){
     ## Figure out which problems overlap which regions.
     setkey(problems, chromStart, chromEnd)
     setkey(chrom.regions, chromStart, chromEnd)
+    chrom.regions$region.i <- 1:nrow(chrom.regions)
     ov.regions <- foverlaps(chrom.regions, problems)
+    region.weight <- 1/table(ov.regions$region.i)
+    ov.regions$weight <- region.weight[paste(ov.regions$region.i)]
+    stopifnot(sum(ov.regions$weight) == nrow(chrom.regions))
     problem.list <- split(ov.regions, ov.regions$problem.name)
     data.list <- list()
     for(problem.name in names(problem.list)){
@@ -203,6 +207,7 @@ for(chrom in names(regions.by.chrom)){
                      min.peaks=exact$peaks[limits$end],
                      max.peaks=exact$peaks[limits$start],
                      errors=min(exact$incorrect.regions),
+                     total.weight=sum(problem.regions$weight),
                      regions=nrow(problem.regions))
 
         error.list[[paste(bases.per.bin, problem.name, chunk.id)]] <- result.dt
@@ -215,11 +220,11 @@ errors <- do.call(rbind, error.list)
 
 res.errors <-
   errors[,
-         .(errors=sum(errors),
-           regions=sum(regions)),
+         .(weighted.error=sum(errors * total.weight),
+           total.weight=sum(total.weight)),
          by=bases.per.bin]
 
-ggplot(res.errors, aes(bases.per.bin, errors))+
+ggplot(res.errors, aes(bases.per.bin, weighted.error))+
   geom_line()+
   geom_point()+
   scale_x_log10()
