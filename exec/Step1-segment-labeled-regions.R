@@ -10,8 +10,9 @@ bases.per.bin.grid <- as.integer(with(resolution.grid, x * y))
 ## Set segmentation problem size (in bins/problem). For example 2000
 ## bins/problem means that 2000 adjacent bins will be used as the data
 ## to segment in 1 segmentation problem. NOTE: the cDPA takes
-## O(bases.per.problem ^2) time, and is empirically faster than the
-## log-linear time pDPA algorithm when bins.per.problem < 4000.
+## quadratic O(bases.per.problem ^2) time, and is empirically faster
+## than the log-linear time pDPA algorithm when bins.per.problem <
+## 4000.
 bins.per.problem <- 2000L
 
 ann.colors <-
@@ -235,5 +236,13 @@ for(bases.per.bin.str in names(features.list)){
          limits=chunk.mats)
 }
 
+
 out.RData <- sub("[^.]*$", "RData", bed.path)
-save(features.limits, errors, file=out.RData)
+save(features.limits, # used for the learning/training.
+     ## (limits separated by chunk for cross-validation).
+     errors, # used for selecting the best resolution before training.
+     regions,
+     ## For this model we will need to compute per-chromosome errors, for
+     ## several different test sets of chunk ids. So save regions so we can
+     ## compute test error later.
+     file=out.RData)
