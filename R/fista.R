@@ -29,7 +29,7 @@ calc.loss.list <- lapply(calc.loss.from.lp.list,function(calc.from.lp){
 })
 
 ### List of functions, each a derivative of a phi loss.
-deriv.list <- list(huber=function(x){
+derivs <- list(huber=function(x){
   ifelse(x<0,-1,ifelse(x<2,x/2-1,0))
 },square=function(x){
   ifelse(x<1,2*(x-1),0)
@@ -38,7 +38,7 @@ deriv.list <- list(huber=function(x){
 })
 
 ### List of calc.grad functions: x, features, limits -> gradient.
-calc.grad.list <- lapply(deriv.list,function(phi.deriv){
+calc.grad.list <- lapply(derivs,function(phi.deriv){
   force(phi.deriv)
   function(x,feat,lim){
     linear.predictor <- as.vector( cbind(1,feat) %*% x )
@@ -59,6 +59,7 @@ regression.funs <- lapply(names(calc.grad.list),function(loss.name){
 })
 names(regression.funs) <- names(calc.grad.list)
 
+### Return 0 for a negative number and the same value otherwise.
 positive.part <- function(x){
   ifelse(x<0, 0, x)
 }
@@ -385,24 +386,6 @@ regularized.interval.regression <- function
 ### List of solver results. For a feature matrix X with p columns, you
 ### can use list$predict(X) to get model estimates of log(lambda).
 }
-
-library.install <- function(x,repos=getOption("repos"),type="source"){
-  if(!require(x,character.only=TRUE)){
-    install.packages(x,repos=repos,type=type)
-    library(x,character.only=TRUE) ## library fails if pkg not found
-  }
-}
-options(repos=c(#"http://cran.miroir-francais.fr/",
-          "http://mirror.ibcp.fr/pub/CRAN/",
-          #"http://cran.univ-lyon1.fr/",
-          "http://cran.r-project.org"))
-
-#library.install("quadmod",repos="http://r-forge.r-project.org")
-library.install("quadprog")
-library.install("ggplot2")
-library.install("reshape2")
-library.install("xtable")
-library.install("tikzDevice")
 
 hinge.interval.regression <- function
 ### Support vector interval regression using a quadratic programming

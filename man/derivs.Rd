@@ -1,9 +1,9 @@
-\name{deriv.list}
-\alias{deriv.list}
+\name{derivs}
+\alias{derivs}
 \docType{data}
-\title{deriv list}
+\title{derivs}
 \description{List of functions, each a derivative of a phi loss.}
-\usage{"\method{deriv}{list}"}
+\usage{"derivs"}
 
 
 
