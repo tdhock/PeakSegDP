@@ -1,8 +1,6 @@
 #include <R.h>
 #include <Rinternals.h>
-#include <gsl/gsl_sf_log.h>
-#include <gsl/gsl_math.h>
-#include <gsl/gsl_blas.h>
+#include "math.h"
 
 
 // Memory efficient and with constraint Poisson dynamic programing
@@ -27,15 +25,12 @@ void cPoisLinProgDyn
   while(i < *lgSeq-1){ 
     k=0;
     while(k < *nStep){
-      res1[(*lgSeq)*k+i] = GSL_POSINF;
-      res3[(*lgSeq)*k+i] = GSL_POSINF;
+      res1[(*lgSeq)*k+i] = INFINITY;
+      res3[(*lgSeq)*k+i] = INFINITY;
       k++;
     }
     i++;	
   }
-
-  //gsl_matrix_view matConstraint = gsl_matrix_view_array(res3, *nStep, *lgSeq);
-  //gsl_matrix_set_all(&matConstraint.matrix, GSL_POSINF);
 	
   /* 	STRT INITIALISATION 	   */
 

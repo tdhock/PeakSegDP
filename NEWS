@@ -1,3 +1,8 @@
+2015.03.05
+
+Do not use GSL headers for positive infinity cost; instead use
+INFINITY defined in "math.h"
+
 2015.03.03
 
 fista.R interval regression code.
