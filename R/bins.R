@@ -64,7 +64,7 @@ binSum <- structure(function
     geom_step(aes(chromStart+0.5, count, color=what),
               data=data.frame(profile, what="profile"),
               size=2)+
-    geom_step(aes(chromStart+0.5, total, color=what),
+    geom_step(aes(chromStart+0.5, count, color=what),
               data=data.frame(bins, what="bin total"))+
     geom_step(aes(chromStart+0.5, mean, color=what),
               data=data.frame(bins, what="bin mean"))+
