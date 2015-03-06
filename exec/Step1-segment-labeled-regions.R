@@ -32,6 +32,10 @@ argv <-
     "/home/thocking/genomelabels/H3K36me3_TDH_immune/McGill0322.bed")
                                   # -> output file  /McGill0322.RData
 
+argv <-
+  c("/home/thocking/genomecov/H3K4me3/McGill0001.bedGraph",
+    "/home/thocking/genomelabels/H3K4me3_PGP_immune/McGill0001.bed")
+
 argv <- commandArgs(trailingOnly=TRUE)
 
 print(argv)
@@ -101,11 +105,13 @@ for(chrom in names(regions.by.chrom)){
     setkey(chrom.regions, chromStart, chromEnd)
     chrom.regions$region.i <- 1:nrow(chrom.regions)
     ov.regions <- foverlaps(chrom.regions, problems)
+    stopifnot(chrom.regions$region.i %in% ov.regions$region.i)
     region.weight <- 1/table(ov.regions$region.i)
     ov.regions$weight <- region.weight[paste(ov.regions$region.i)]
     stopifnot(sum(ov.regions$weight) == nrow(chrom.regions))
     problem.list <- split(ov.regions, ov.regions$problem.name)
     data.list <- list()
+    check.list <- list()
     for(problem.name in names(problem.list)){
       RData.base <- paste0(problem.name, ".RData")
       RData.path <- file.path(chrom.dir, RData.base)
@@ -208,12 +214,16 @@ for(chrom in names(regions.by.chrom)){
                      min.peaks=exact$peaks[limits$end],
                      max.peaks=exact$peaks[limits$start],
                      weighted.error=min(exact$weighted.error),
-                     total.weight=sum(problem.regions$weight),
-                     regions=nrow(problem.regions))
+                     total.weight=sum(chunk.regions$weight),
+                     regions=nrow(chunk.regions))
 
-        error.list[[paste(bases.per.bin, problem.name, chunk.id)]] <- result.dt
+        error.list[[paste(bases.per.bin, problem.name, chunk.id)]] <-
+          check.list[[paste(bases.per.bin, problem.name, chunk.id)]] <-
+            result.dt
       }#chunk.id
-    }#problem.str
+    }#problem.name
+    check.dt <- do.call(rbind, check.list)
+    stopifnot(sum(check.dt$total.weight) == nrow(chrom.regions))
   }#problem.size.i
 }#chrom
 
@@ -224,6 +234,7 @@ res.errors <-
          .(weighted.error=sum(weighted.error),
            total.weight=sum(total.weight)),
          by=bases.per.bin]
+stopifnot(res.errors$total.weight == res.errors$total.weight[1])
 
 ggplot(res.errors, aes(bases.per.bin, weighted.error))+
   geom_line()+
