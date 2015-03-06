@@ -72,8 +72,11 @@ setkey(sample.coverage, chrom, chromStart, chromEnd)
 base.dir <- sub("[.][a-zA-Z]*$", "", bedGraph.path)
 
 features.list <- list()
+modelSelection.list <- list() # for computing test error.
+peaks.list <- list() # for computing test error.
 limits.list <- list()
 error.list <- list()
+problem.list <- list()# for deterimining where to keep peaks.
 for(chrom in names(regions.by.chrom)){
   chrom.regions <- regions.by.chrom[[chrom]]
   chrom.coverage <- sample.coverage[chrom]
@@ -99,6 +102,8 @@ for(chrom in names(regions.by.chrom)){
                    problemEnd, chrom.bases)))
     problems[, problem.name :=
              sprintf("%s:%09d-%09d", chrom, chromStart, chromEnd)]
+
+    problem.list[[paste(bases.per.bin)]][[chrom]] <- problems
 
     ## Figure out which problems overlap which regions.
     setkey(problems, chromStart, chromEnd)
@@ -171,16 +176,23 @@ for(chrom in names(regions.by.chrom)){
       }#if(file.exists(RData.path))/else
 
       features.list[[paste(bases.per.bin)]][[problem.name]] <- features
-      
+
       all.loss <- data.frame(fit$error)
       all.loss$cummin <- cummin(all.loss$error)
       loss <- subset(all.loss, error == cummin)
       rownames(loss) <- loss$segments
       exact <- with(loss, exactModelSelection(error, segments))
       exact$segments <- exact$model.complexity
-      exact$weighted.error <- NA
       rownames(exact) <- exact$segments
       exact$peaks <- loss[paste(exact$segments), "peaks"]
+
+      ## To map a predicted penalty value back to peaks, we need to
+      ## store the exact model selection function and the list of
+      ## peaks.
+      modelSelection.list[[paste(bases.per.bin)]][[problem.name]] <- exact
+      peaks.list[[paste(bases.per.bin)]][[problem.name]] <- fit$peaks
+      
+      exact$weighted.error <- NA
       rownames(exact) <- exact$peaks
       problem.regions[, chromStart := i.chromStart ]
       problem.regions[, chromEnd := i.chromEnd ]
@@ -252,7 +264,11 @@ for(bases.per.bin.str in names(features.list)){
   }
   features.limits[[bases.per.bin.str]] <-
     list(features=do.call(rbind, features.list[[bases.per.bin.str]]),
-         limits=chunk.mats)
+         ## matrix[problem, feature]
+         limits=chunk.mats, #matrix[problem, ]
+         problems=problem.list[[bases.per.bin.str]],
+         modelSelection=modelSelection.list[[bases.per.bin.str]],#list[problem]
+         peaks=peaks.list[[bases.per.bin.str]])#list[problem]
 }
 
 out.RData <- sub("[^.]*$", "RData", bed.path)
