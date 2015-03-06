@@ -223,7 +223,8 @@ for(chrom in names(regions.by.chrom)){
       }#chunk.id
     }#problem.name
     check.dt <- do.call(rbind, check.list)
-    stopifnot(sum(check.dt$total.weight) == nrow(chrom.regions))
+    stopifnot(all.equal(sum(check.dt$total.weight),
+                        nrow(chrom.regions)))
   }#problem.size.i
 }#chrom
 
@@ -234,7 +235,8 @@ res.errors <-
          .(weighted.error=sum(weighted.error),
            total.weight=sum(total.weight)),
          by=bases.per.bin]
-stopifnot(res.errors$total.weight == res.errors$total.weight[1])
+exp.weight <- rep(res.errors$total.weight[1], nrow(res.errors))
+stopifnot(all.equal(res.errors$total.weight, exp.weight))
 
 ggplot(res.errors, aes(bases.per.bin, weighted.error))+
   geom_line()+
