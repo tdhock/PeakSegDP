@@ -172,7 +172,7 @@ for(chrom in names(regions.by.chrom)){
       rownames(loss) <- loss$segments
       exact <- with(loss, exactModelSelection(error, segments))
       exact$segments <- exact$model.complexity
-      exact$incorrect.regions <- 0
+      exact$weighted.error <- NA
       rownames(exact) <- exact$segments
       exact$peaks <- loss[paste(exact$segments), "peaks"]
       rownames(exact) <- exact$peaks
@@ -184,11 +184,12 @@ for(chrom in names(regions.by.chrom)){
         for(param.name in rownames(exact)){
           param.peaks <- fit$peaks[[param.name]]
           error <- PeakErrorChrom(param.peaks, chunk.regions)
-          exact[param.name, "incorrect.regions"] <-
-            with(error, sum(fp+fn))
+          error$weight <- chunk.regions$weight
+          error$weighted.error <- with(error, weight * (fp+fn))
+          exact[param.name, "weighted.error"] <- sum(error$weighted.error)
         }
         limits <- with(exact, {
-          largestContinuousMinimum(incorrect.regions,
+          largestContinuousMinimum(weighted.error,
                                    max.log.lambda-min.log.lambda)
         })
 
@@ -206,7 +207,7 @@ for(chrom in names(regions.by.chrom)){
                      cDPA.seconds,
                      min.peaks=exact$peaks[limits$end],
                      max.peaks=exact$peaks[limits$start],
-                     errors=min(exact$incorrect.regions),
+                     weighted.error=min(exact$weighted.error),
                      total.weight=sum(problem.regions$weight),
                      regions=nrow(problem.regions))
 
@@ -220,7 +221,7 @@ errors <- do.call(rbind, error.list)
 
 res.errors <-
   errors[,
-         .(weighted.error=sum(errors * total.weight),
+         .(weighted.error=sum(weighted.error),
            total.weight=sum(total.weight)),
          by=bases.per.bin]
 
@@ -240,7 +241,6 @@ for(bases.per.bin.str in names(features.list)){
     list(features=do.call(rbind, features.list[[bases.per.bin.str]]),
          limits=chunk.mats)
 }
-
 
 out.RData <- sub("[^.]*$", "RData", bed.path)
 save(features.limits, # used for the learning/training.
