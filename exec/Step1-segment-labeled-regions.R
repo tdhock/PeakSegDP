@@ -76,7 +76,7 @@ modelSelection.list <- list() # for computing test error.
 peaks.list <- list() # for computing test error.
 limits.list <- list()
 error.list <- list()
-problem.list <- list()# for deterimining where to keep peaks.
+all.problem.list <- list()# for deterimining where to keep peaks.
 for(chrom in names(regions.by.chrom)){
   chrom.regions <- regions.by.chrom[[chrom]]
   chrom.coverage <- sample.coverage[chrom]
@@ -103,7 +103,7 @@ for(chrom in names(regions.by.chrom)){
     problems[, problem.name :=
              sprintf("%s:%09d-%09d", chrom, chromStart, chromEnd)]
 
-    problem.list[[paste(bases.per.bin)]][[chrom]] <- problems
+    all.problem.list[[paste(bases.per.bin)]][[chrom]] <- problems
 
     ## Figure out which problems overlap which regions.
     setkey(problems, chromStart, chromEnd)
@@ -266,7 +266,7 @@ for(bases.per.bin.str in names(features.list)){
     list(features=do.call(rbind, features.list[[bases.per.bin.str]]),
          ## matrix[problem, feature]
          limits=chunk.mats, #matrix[problem, ]
-         problems=problem.list[[bases.per.bin.str]],
+         problems=all.problem.list[[bases.per.bin.str]],
          modelSelection=modelSelection.list[[bases.per.bin.str]],#list[problem]
          peaks=peaks.list[[bases.per.bin.str]])#list[problem]
 }
