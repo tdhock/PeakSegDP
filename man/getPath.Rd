@@ -1,7 +1,7 @@
 \name{getPath}
 \alias{getPath}
 \title{getPath}
-\description{Extract endpoint matrix from PoissonSeg result.}
+\description{Extract endpoint matrix from cDPA result.}
 \usage{getPath(A)}
 \arguments{
   \item{A}{

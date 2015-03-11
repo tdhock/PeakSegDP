@@ -1,95 +1,3 @@
-PoissonSeg <- structure(function
-### A dynamic programming algorithm can be used to compute the best
-### segmentation with respect to the Poisson likelihood, subject to a
-### constraint on the number of segments, and the changes which must
-### alternate: up, down, up, down, ...
-(count,
-### Integer vector of count data to segment.
- weight=rep(1, length(count)),
-### Data weights (normally this is the number of base pairs).
- maxSegments
-### Maximum number of segments to consider.
- ){
-  stopifnot(is.numeric(count))
-  stopifnot(is.numeric(weight))
-  stopifnot(length(count) == length(weight))
-  stopifnot(length(maxSegments) == 1)
-  nData <- length(count)
-  A <- .C("cPoisLinProgDyn",
-          count=as.integer(count),
-          weight=as.integer(weight),
-          nData=as.integer(nData),
-          maxSegments=as.integer(maxSegments),
-          res1=double(maxSegments*nData),
-          res2=integer(maxSegments*nData),
-          res3=double(maxSegments*nData),
-          PACKAGE="PeakSegDP")
-  A$res1 <- matrix(A$res1, nrow=maxSegments, byrow=TRUE)
-  A$res2 <- matrix(A$res2, nrow=maxSegments, byrow=TRUE)
-  A$res3 <- matrix(A$res3, nrow=maxSegments, byrow=TRUE)
-  return(A)
-}, ex=function(){
-  fit <- PoissonSeg(c(0, 10, 11, 1), maxSegments=3)
-  stopifnot(fit$res2[3,4] == 3)
-  stopifnot(fit$res2[2,3] == 1)
-})
-
-### Compute the weighted Poisson loss function, which is seg.mean -
-### count * log(seg.mean). The edge case is when the mean is zero, in
-### which case the probability mass function takes a value of 1 when
-### the data is 0 (and 0 otherwise). Thus the log-likelihood of a
-### maximum likelihood segment with mean zero must be zero.
-PoissonLoss <- structure(function(count, seg.mean, weight=1){
-  stopifnot(is.numeric(count))
-  stopifnot(is.numeric(seg.mean))
-  stopifnot(is.numeric(weight))
-  n.data <- length(count)
-  if(length(seg.mean) == 1){
-    seg.mean <- rep(seg.mean, n.data)
-  }
-  if(length(weight) == 1){
-    weight <- rep(weight, n.data)
-  }
-  stopifnot(n.data == length(seg.mean))
-  stopifnot(n.data == length(weight))
-  if(any(weight < 0)){
-    stop("PoissonLoss undefined for negative weight")
-  }
-  if(any(seg.mean < 0)){
-    stop("PoissonLoss undefined for negative segment mean")
-  }
-  not.integer <- round(count) != count
-  not.positive <- count < 0
-  loss <-
-    ifelse(not.integer|not.positive, Inf,
-           ifelse(seg.mean == 0,
-                  ifelse(count == 0, 0, Inf),
-                  seg.mean - count * log(seg.mean)))
-  sum(loss*weight)
-}, ex=function(){
-  PoissonLoss(1, 1)
-  PoissonLoss(0, 0)
-  PoissonLoss(1, 0)
-  PoissonLoss(0, 1)
-})
-
-### Extract endpoint matrix from PoissonSeg result.
-getPath <- function(A){
-  n <- ncol(A$res2)
-  res3 <- matrix(NA, nrow=nrow(A$res2), ncol=nrow(A$res2))
-  res3[1, 1] <- 0
-  for(i in 2: nrow(A$res2)){
-    res3[i, i-1] <- A$res2[i, n]
-    if(res3[i, i-1] > 0){
-      for(k in 1:(i-1)){
-        res3[i, i-1-k] <- A$res2[i-k, res3[i, i-k]]
-      }
-    }
-  }
-  diag(res3) <- ncol(A$res2)
-  return(res3)
-}
-
 PeakSegDP <- structure(function
 ### Compute the PeakSeg model on a data.frame of compressed sequence
 ### reads.
@@ -111,7 +19,7 @@ PeakSegDP <- structure(function
   maxSegments <- maxPeaks * 2 + 1
   stopifnot(maxSegments > 0)
   stopifnot(maxSegments <= nrow(compressed))
-  fit <- PoissonSeg(count, weight, maxSegments)
+  fit <- cDPA(count, weight, maxSegments)
   segment.ends <- getPath(fit)
   results <- list(breaks=list())
   for(peaks in 0:maxPeaks){

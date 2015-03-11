@@ -2,6 +2,8 @@
 
 clusterPeaks C code.
 
+LinDynProg.c renamed to cDPA to be consistent with paper.
+
 2015.03.05
 
 Do not use GSL headers for positive infinity cost; instead use

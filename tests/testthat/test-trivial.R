@@ -3,9 +3,9 @@ context("trivial examples")
 pseg3 <- function(...){
   y <- c(...)
   w <- rep(1, length(y))
-  ## TODO: when we write a real solver it should replace PoissonSeg
-  ## (the DP code which does not pass all these tests).
-  fit <- PoissonSeg(y, rep(1, length(y)), 3)
+  ## TODO: when we write a real solver it should replace cDPA, which
+  ## does not pass all these tests.
+  fit <- cDPA(y, rep(1, length(y)), 3)
   ends <- getPath(fit)
   e <- ends[3,]
   if(any(is.na(e))){

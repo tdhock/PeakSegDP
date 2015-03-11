@@ -12,5 +12,7 @@ devtools::install_github("tdhock/PeakSegDP")
 library(PeakSegDP)
 example(PeakSegDP)
 example(largestContinuousMinimum)
+example(binSum)
+example(clusterPeaks)
 #+END_SRC
 
