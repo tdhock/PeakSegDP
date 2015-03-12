@@ -6,6 +6,13 @@
 #include <stdlib.h>
 #include <math.h>
 
+double OptimalPoissonLoss(int cumsum_value, double mean_value){
+  if(cumsum_value == 0){
+    return 0.0;
+  }
+  return cumsum_value * (1-log(mean_value));
+}
+
 int
 multiSampleSeg(
   struct Profile **samples,
@@ -70,11 +77,7 @@ multiSampleSeg(
       cumsum_vec[bin_i] = cumsum_value;
       mean_value = ((double) cumsum_value) / ((double)bin_i+1);
       mean_vec[bin_i] = mean_value;
-      if(cumsum_value == 0){
-	loss_vec[bin_i] = 0.0;
-      }else{
-	loss_vec[bin_i] = cumsum_value * (1-log(mean_value));
-      }
+      loss_vec[bin_i] = OptimalPoissonLoss(cumsum_value, mean_value);
       /* printf("[%3d,%3d]=%d %f %f\n", sample_i, bin_i,  */
       /* 	     cumsum_value, mean_value,  */
       /* 	     ((double)count_vec[bin_i])/((double)bases_per_bin)); */
@@ -83,6 +86,8 @@ multiSampleSeg(
   int maxSegments = 3;
   double *model_loss_mat = (double*) malloc(
     n_bins * maxSegments * sizeof(double));
+  int *model_first_mat = (int*) malloc(
+    n_bins * maxSegments * sizeof(int));
   for(bin_i=0; bin_i < n_bins; bin_i++){
     model_loss_mat[bin_i] = 0;
     for(sample_i=0; sample_i < n_samples; sample_i++){
@@ -107,7 +112,7 @@ multiSampleSeg(
 	    cumsum_vec[LastSeg_FirstIndex-1];
 	  mean_value = ((double)cumsum_value)/
 	    ((double)LastSeg_LastIndex-LastSeg_FirstIndex+1);
-	  LastSeg_loss += cumsum_value *(1-log(mean_value));
+	  LastSeg_loss += OptimalPoissonLoss(cumsum_value, mean_value);
 	}
 	candidate_loss = LastSeg_loss + prev_loss;
 	if(candidate_loss < min_loss){
@@ -115,18 +120,36 @@ multiSampleSeg(
 	  best_FirstIndex = LastSeg_FirstIndex;
 	}
       }
-      printf("segment_i=%d First=%d loss=%f\n",
-	     segment_i, best_FirstIndex, min_loss);
+      model_first_mat[LastSeg_LastIndex + n_bins*segment_i] = best_FirstIndex;
       model_loss_mat[LastSeg_LastIndex + n_bins*segment_i] = min_loss;
     }
   }
+  // For the best segmentation in 3 segments up to n_bins-1, the first
+  // index of the 3rd segment is
+  int seg3_FirstIndex = model_first_mat[n_bins*3-1];
+  int seg2_LastIndex = seg3_FirstIndex-1;
+  int seg2_FirstIndex = model_first_mat[n_bins*1+seg2_LastIndex];
+
+  /* printf("[0,%d] [%d,%d] [%d,%d]\n", */
+  /* 	 seg2_FirstIndex-1, */
+  /* 	 seg2_FirstIndex, seg2_LastIndex, */
+  /* 	 seg3_FirstIndex, n_bins-1); */
+
+  /* for(bin_i=0; bin_i < n_bins; bin_i++){ */
+  /*   printf("bin_i=%3d", bin_i); */
+  /*   for(segment_i=1; segment_i < 3; segment_i++){ */
+  /*     printf(" %d", model_first_mat[bin_i + n_bins * segment_i]); */
+  /*   } */
+  /*   printf("\n"); */
+  /* } */
   free(model_loss_mat);
+  free(model_first_mat);
   free(sample_count_mat);
   free(sample_cumsum_mat);
   free(sample_mean1_mat);
   free(sample_loss1_mat);
-  optimal_start_end[0] = max_chromStart;
-  optimal_start_end[1] = min_chromEnd;
+  optimal_start_end[0] = max_chromStart + bases_per_bin * seg2_FirstIndex;
+  optimal_start_end[1] = max_chromStart + bases_per_bin * seg3_FirstIndex;
   return 0;
 }
 
