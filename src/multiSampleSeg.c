@@ -4,6 +4,7 @@
 #include "binSum.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 int
 multiSampleSeg(
@@ -38,26 +39,47 @@ multiSampleSeg(
   if(bases <= n_bins){
     return ERROR_FEWER_BASES_THAN_BINS;
   }
-  int *bin_mat = (int*) malloc(n_bins * n_samples * sizeof(int));
+  int *count_mat = (int*) malloc(n_bins * n_samples * sizeof(int));
+  int *cumsum_mat = (int*) malloc(n_bins * n_samples * sizeof(int));
+  double *mean1_mat = (double*) malloc(n_bins * n_samples * sizeof(double));
+  double *loss1_mat = (double*) malloc(n_bins * n_samples * sizeof(double));
   int status;
   for(sample_i=0; sample_i < n_samples; sample_i++){
     profile = samples[sample_i];
     status = binSum(profile->chromStart, profile->chromEnd,
 		    profile->coverage, profile->n_entries,
-		    bin_mat + n_bins*sample_i,
+		    count_mat + n_bins*sample_i,
 		    bases_per_bin, n_bins, max_chromStart);
   }//for sample_i
-  int *bin_cumsum = (int*) malloc(n_bins * n_samples * sizeof(int));
-  int sample_cumsum, bin_i;
+  int bin_i, offset;
+  int *count_vec, *cumsum_vec, cumsum_value;
+  double *mean_vec, *loss_vec, mean_value, loss_value;
   for(sample_i=0; sample_i < n_samples; sample_i++){
-    sample_cumsum = 0;
+    cumsum_value = 0;
+    offset = n_bins * sample_i;
+    count_vec = count_mat + offset;
+    cumsum_vec = cumsum_mat + offset;
+    mean_vec = mean1_mat + offset;
+    loss_vec = loss1_mat + offset;
     for(bin_i=0; bin_i < n_bins; bin_i++){
-      sample_cumsum += bin_mat[bin_i + sample_i*n_bins];
-      bin_cumsum[bin_i + sample_i*n_bins] = sample_cumsum;
-      //printf("[%3d,%3d]=%d\n", sample_i, bin_i, sample_cumsum);
+      cumsum_value += count_vec[bin_i];
+      cumsum_vec[bin_i] = cumsum_value;
+      mean_value = ((double) cumsum_value) / ((double)bin_i+1);
+      mean_vec[bin_i] = mean_value;
+      if(cumsum_value == 0){
+	loss_vec[bin_i] = 0.0;
+      }else{
+	loss_vec[bin_i] = cumsum_value * (1-log(mean_value));
+      }
+      printf("[%3d,%3d]=%d %f %f\n", sample_i, bin_i, 
+	     cumsum_value, mean_value, 
+	     ((double)count_vec[bin_i])/((double)bases_per_bin));
     }
-  }  
-  free(bin_mat);
+  }
+  free(count_mat);
+  free(cumsum_mat);
+  free(mean1_mat);
+  free(loss1_mat);
   optimal_start_end[0] = max_chromStart;
   optimal_start_end[1] = min_chromEnd;
   return 0;
