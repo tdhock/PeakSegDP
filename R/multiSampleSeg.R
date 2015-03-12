@@ -3,18 +3,25 @@ multiSampleSeg <- structure(function
 (profiles,
  n.bins=100L
  ){
+  stopifnot(is.numeric(n.bins))
+  stopifnot(length(n.bins)==1)
+  stopifnot(n.bins >= 3)
   if(is.data.frame(profiles)){
     profiles <- split(profiles, profiles$sample.id, drop=TRUE)
   }
   stopifnot(is.list(profiles))
   for(profile.i in seq_along(profiles)){
-    profiles[[profile.i]] <-
-      data.frame(profiles[[profile.i]])[, c("chromStart", "chromEnd", "count")]
+    df <- profiles[[profile.i]]
+    stopifnot(is.data.frame(df))
+    stopifnot(is.integer(df$chromStart))
+    stopifnot(is.integer(df$chromEnd))
+    stopifnot(is.integer(df$count))
+    profiles[[profile.i]] <- df[, c("chromStart", "chromEnd", "count")]
   }
   chromStartEnd <-
     .Call("multiSampleSeg_interface",
           profiles,
-          n.bins,
+          as.integer(n.bins),
           PACKAGE="PeakSegDP")
   data.frame(chromStart=chromStartEnd[1],
              chromEnd=chromStartEnd[2])
@@ -25,7 +32,7 @@ multiSampleSeg <- structure(function
                 118090000 < chromStart &
                 chromEnd < 118100000 &
                 sample.id %in% c("McGill0002", "McGill0004"))
-  peak <- multiSampleSeg(two)
+  peak <- multiSampleSeg(two, 10)
   library(ggplot2)
   ggplot()+
     geom_step(aes(chromStart/1e3, count), data=two)+
