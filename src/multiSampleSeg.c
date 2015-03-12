@@ -47,6 +47,16 @@ multiSampleSeg(
 		    bin_mat + n_bins*sample_i,
 		    bases_per_bin, n_bins, max_chromStart);
   }//for sample_i
+  int *bin_cumsum = (int*) malloc(n_bins * n_samples * sizeof(int));
+  int sample_cumsum, bin_i;
+  for(sample_i=0; sample_i < n_samples; sample_i++){
+    sample_cumsum = 0;
+    for(bin_i=0; bin_i < n_bins; bin_i++){
+      sample_cumsum += bin_mat[bin_i + sample_i*n_bins];
+      bin_cumsum[bin_i + sample_i*n_bins] = sample_cumsum;
+      //printf("[%3d,%3d]=%d\n", sample_i, bin_i, sample_cumsum);
+    }
+  }  
   free(bin_mat);
   optimal_start_end[0] = max_chromStart;
   optimal_start_end[1] = min_chromEnd;
