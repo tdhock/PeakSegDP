@@ -12,16 +12,19 @@ multiSampleSeg_interface(
   ){
   int n_profiles = length(profile_list);
   int profile_i;
-  SEXP df;
+  SEXP df, chromStart, chromEnd, coverage;
   struct Profile *profile;
   struct Profile **samples = malloc(n_profiles * sizeof(struct Profile *));
   for(profile_i=0; profile_i < n_profiles; profile_i++){
     df = VECTOR_ELT(profile_list, profile_i);
     profile = malloc(sizeof(struct Profile));
-    profile->chromStart = INTEGER(VECTOR_ELT(df, 0));
-    profile->chromEnd = INTEGER(VECTOR_ELT(df, 1));
-    profile->coverage = INTEGER(VECTOR_ELT(df, 2));
-    profile->n_entries = length(df);
+    chromStart = VECTOR_ELT(df, 0);
+    chromEnd = VECTOR_ELT(df, 1);
+    coverage = VECTOR_ELT(df, 2);
+    profile->chromStart = INTEGER(chromStart);
+    profile->chromEnd = INTEGER(chromEnd);
+    profile->coverage = INTEGER(coverage);
+    profile->n_entries = length(chromStart);
     samples[profile_i] = profile;
   }
   int status, n_bins_int;

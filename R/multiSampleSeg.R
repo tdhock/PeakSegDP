@@ -4,7 +4,7 @@ multiSampleSeg <- structure(function
  n.bins=100L
  ){
   if(is.data.frame(profiles)){
-    profiles <- split(profiles, profiles$sample.id)
+    profiles <- split(profiles, profiles$sample.id, drop=TRUE)
   }
   stopifnot(is.list(profiles))
   for(profile.i in seq_along(profiles)){
