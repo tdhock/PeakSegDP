@@ -19,7 +19,7 @@ int binSum
   // (999, 1000], but start counting (0, 1001], (1000, 1001], (1000, 1002].
   bin_i = 0;
   while(profile_chromEnd[profile_i] <= bin_chromStart){
-    profile_i ++ ;
+    profile_i ++;
   }
   int count_until, bases, bin_add, profile_add;
   int begin_count_after = bin_chromStart;
