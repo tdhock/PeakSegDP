@@ -7,7 +7,7 @@ struct Profile {
   int n_entries;
 };
 
-multiSampleSeg(
+int multiSampleSeg(
   struct Profile **samples,
   int n_samples,
   int n_bins,

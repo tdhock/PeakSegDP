@@ -29,7 +29,7 @@ multiSampleSeg_interface(
   SEXP optimal;
   PROTECT(optimal = allocVector(INTSXP, 2));
   int *optimal_ptr = INTEGER(optimal);
-  status = multiSampleSeg(samples, n_profiles, optimal_ptr);
+  status = multiSampleSeg(samples, n_profiles, n_bins_int, optimal_ptr);
   // TODO: if known status codes...
   if(status != 0){
     error("unrecognized error code %d", status);
@@ -38,5 +38,6 @@ multiSampleSeg_interface(
     free(samples[profile_i]);
   }
   free(samples);
+  UNPROTECT(1);
   return optimal;
 }
