@@ -32,7 +32,7 @@ multiSampleSeg <- structure(function
                 118090000 < chromStart &
                 chromEnd < 118100000 &
                 sample.id %in% c("McGill0002", "McGill0004"))
-  peak <- multiSampleSeg(two, 10)
+  peak <- multiSampleSeg(two, 150)
   library(ggplot2)
   ggplot()+
     geom_step(aes(chromStart/1e3, count), data=two)+

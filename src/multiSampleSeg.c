@@ -43,6 +43,7 @@ multiSampleSeg(
   }
   int bases = min_chromEnd - max_chromStart;
   int bases_per_bin = bases/n_bins;
+  printf("bases_per_bin=%d\n", bases_per_bin);
   if(bases <= n_bins){
     return ERROR_FEWER_BASES_THAN_BINS;
   }
@@ -129,6 +130,8 @@ multiSampleSeg(
   int seg3_FirstIndex = model_first_mat[n_bins*3-1];
   int seg2_LastIndex = seg3_FirstIndex-1;
   int seg2_FirstIndex = model_first_mat[n_bins*1+seg2_LastIndex];
+  int peakStart = max_chromStart + bases_per_bin * seg2_FirstIndex;
+  int peakEnd = max_chromStart + bases_per_bin * seg3_FirstIndex;
 
   /* printf("[0,%d] [%d,%d] [%d,%d]\n", */
   /* 	 seg2_FirstIndex-1, */
@@ -142,14 +145,49 @@ multiSampleSeg(
   /*   } */
   /*   printf("\n"); */
   /* } */
+
+  //Now we zoom in, and search on the left and right bins.
+  int zoom_bases = bases_per_bin * 2;
+  int zoom_bases_per_bin = zoom_bases/n_bins;
+  int left_chromStart, right_chromStart;
+  if(zoom_bases_per_bin <= 1){ // last iteration.
+    left_chromStart = peakStart - n_bins/2;
+    right_chromStart = peakEnd - n_bins/2;
+    zoom_bases_per_bin = 1;
+    zoom_bases = zoom_bases_per_bin * n_bins;
+  }else{
+    left_chromStart = peakStart - bases_per_bin;
+    right_chromStart = peakEnd - bases_per_bin;
+  }
+  int *left_count_mat = (int*) malloc(n_bins * n_samples * sizeof(int));
+  int *right_count_mat = (int*) malloc(n_bins * n_samples * sizeof(int));
+  printf("[%d,%d] [%d,%d] zoom_bases=%d zoom_bases_per_bin=%d\n",
+	 left_chromStart, left_chromStart + zoom_bases,
+	 right_chromStart, right_chromStart + zoom_bases,
+	 zoom_bases, zoom_bases_per_bin);
+  for(sample_i=0; sample_i < n_samples; sample_i++){
+    profile = samples[sample_i];
+    status = binSum(profile->chromStart, profile->chromEnd,
+		    profile->coverage, profile->n_entries,
+		    left_count_mat + n_bins*sample_i,
+		    zoom_bases_per_bin, n_bins, left_chromStart);
+    status = binSum(profile->chromStart, profile->chromEnd,
+		    profile->coverage, profile->n_entries,
+		    right_count_mat + n_bins*sample_i,
+		    zoom_bases_per_bin, n_bins, left_chromStart);
+  }//for sample_i
+
+  //cleanup!
+  free(left_count_mat);
+  free(right_count_mat);
   free(model_loss_mat);
   free(model_first_mat);
   free(sample_count_mat);
   free(sample_cumsum_mat);
   free(sample_mean1_mat);
   free(sample_loss1_mat);
-  optimal_start_end[0] = max_chromStart + bases_per_bin * seg2_FirstIndex;
-  optimal_start_end[1] = max_chromStart + bases_per_bin * seg3_FirstIndex;
+  optimal_start_end[0] = peakStart;
+  optimal_start_end[1] = peakEnd;
   return 0;
 }
 
