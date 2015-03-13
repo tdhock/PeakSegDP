@@ -161,6 +161,10 @@ multiSampleSegHeuristic(
     seg1_loss_vec[bin_i] = 0;
     for(sample_i=0; sample_i < n_samples; sample_i++){
       cumsum_value = sample_cumsum_mat[n_bins*sample_i+bin_i];
+      /*
+      printf("bin=%d sample=%d cumsum=%d\n", 
+	     bin_i, sample_i, cumsum_value);
+      */
       mean_value = ((double) cumsum_value) / ((double)bin_i+1);
       loss_value = OptimalPoissonLoss(cumsum_value, mean_value);
       seg1_loss_vec[bin_i] += loss_value;
@@ -173,7 +177,7 @@ multiSampleSegHeuristic(
   double *seg12_loss_vec = (double*) malloc(n_bins * sizeof(double));
   int *seg2_first_vec = (int*) malloc(n_bins * sizeof(int));
   int seg2_FirstIndex, seg2_LastIndex, best_FirstIndex;
-  double seg1_loss, min_loss, seg2_loss, candidate_loss;
+  double seg1_loss, min_loss, seg2_loss, candidate_loss, seg3_loss;
   for(seg2_LastIndex=1; 
       seg2_LastIndex < n_bins; 
       seg2_LastIndex++){
@@ -248,30 +252,77 @@ multiSampleSegHeuristic(
     if(status != 0){
       return status;
     }
-    left_cumsum_value = sample_cumsum_mat[n_bins*sample_i+seg1_LastIndex];
+    if(seg1_LastIndex > 0){
+      left_cumsum_value = sample_cumsum_mat[n_bins*sample_i+seg1_LastIndex-1];
+    }else{
+      left_cumsum_value = 0;
+    }
     left_cumsum_mat[n_cumsum_zoom*sample_i] = left_cumsum_value;
-    right_cumsum_value = sample_cumsum_mat[n_bins*sample_i+seg2_LastIndex];
+    right_cumsum_value = sample_cumsum_mat[n_bins*sample_i+seg2_LastIndex-1];
     right_cumsum_mat[n_cumsum_zoom*sample_i] = right_cumsum_value;
+    /*
+    printf("sample=%d left=%d right=%d\n", 
+	   sample_i, left_cumsum_value, right_cumsum_value);
+    */
     for(bin_i=0; bin_i < n_bins_zoom; bin_i++){
       left_cumsum_value += left_count_mat[n_bins_zoom*sample_i + bin_i];
       left_cumsum_mat[n_cumsum_zoom*sample_i+bin_i+1] = left_cumsum_value;
       right_cumsum_value += right_count_mat[n_bins_zoom*sample_i + bin_i];
+      //printf("left=%d right=%d\n", left_cumsum_value, right_cumsum_value);
       right_cumsum_mat[n_cumsum_zoom*sample_i+bin_i+1] = right_cumsum_value;
     }
   }//for sample_i
   
-  double bases_value;
+  double bases_value, seg1_loss_value;
+  int best_seg2_FirstIndex, best_seg3_FirstIndex, 
+    seg2_chromEnd, seg1_chromEnd, after_cumsum,
+    last_bin_cumsum, cumsum_seg2_end;
+  min_loss = INFINITY;
   for(seg2_FirstIndex=1; seg2_FirstIndex <= n_bins_zoom; seg2_FirstIndex++){
-    seg1_LastIndex = seg2_firstIndex-1;
-    seg1_loss_value = 0.0;
+    seg1_LastIndex = seg2_FirstIndex-1;
+    seg1_chromEnd = left_chromStart + seg1_LastIndex*bases_per_bin_zoom;
+    seg1_loss = 0.0;
     for(sample_i=0; sample_i < n_samples; sample_i++){
-      cumsum_value = left_cumsum_value[n_bins_zoom*sample_i+seg1_LastIndex];
-      bases_value = left_chromStart - max_chromStart + 
-	seg1_LastIndex*bases_per_bin_zoom;
+      cumsum_value = left_cumsum_mat[n_cumsum_zoom*sample_i+seg1_LastIndex];
+      bases_value = seg1_chromEnd - max_chromStart;
       mean_value = ((double)cumsum_value)/bases_value;
-      seg1_loss_value += OptimalPoissonLoss(cumsum_value, mean_value);
+      seg1_loss += OptimalPoissonLoss(cumsum_value, mean_value);
+    }
+    for(seg3_FirstIndex=1; seg3_FirstIndex <= n_bins_zoom; seg3_FirstIndex++){
+      seg2_LastIndex = seg3_FirstIndex -1;
+      seg2_chromEnd = right_chromStart + seg2_LastIndex*bases_per_bin_zoom;
+      if(seg1_chromEnd < seg2_chromEnd){
+	seg2_loss = 0.0;
+	seg3_loss = 0.0;
+	for(sample_i=0; sample_i < n_samples; sample_i++){
+	  // first compute seg2_loss.
+	  cumsum_seg2_end = right_cumsum_mat[
+	    n_cumsum_zoom*sample_i+seg2_LastIndex];
+	  cumsum_value = cumsum_seg2_end-
+	    left_cumsum_mat[n_cumsum_zoom*sample_i+seg1_LastIndex];
+	  bases_value = seg2_chromEnd - seg1_chromEnd;	  
+	  mean_value = ((double)cumsum_value)/bases_value;
+	  seg2_loss += OptimalPoissonLoss(cumsum_value, mean_value);
+	  // then compute seg3_loss.
+	  last_bin_cumsum = sample_cumsum_mat[n_bins*(sample_i+1)-1];
+	  //after_cumsum = -
+	  cumsum_value = last_bin_cumsum - cumsum_seg2_end;
+	  bases_value = min_chromEnd - seg2_chromEnd;
+	  mean_value = ((double)cumsum_value)/bases_value;
+	  seg3_loss += OptimalPoissonLoss(cumsum_value, mean_value);
+	}
+	candidate_loss = seg1_loss + seg2_loss + seg3_loss;
+	if(candidate_loss < min_loss){
+	  min_loss = candidate_loss;
+	  best_seg2_FirstIndex = seg2_FirstIndex;
+	  best_seg3_FirstIndex = seg3_FirstIndex;
+	}
+      }
     }
   }
+  //printf("%d %d\n", best_seg2_FirstIndex, best_seg3_FirstIndex);
+  peakStart = left_chromStart + bases_per_bin_zoom * (best_seg2_FirstIndex-1);
+  peakEnd = right_chromStart + bases_per_bin_zoom * (best_seg3_FirstIndex-1);
 
   //cleanup!
   free(left_count_mat);
