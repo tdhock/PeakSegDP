@@ -64,7 +64,7 @@ multiSampleSegHeuristic(
     bases_per_bin *= bin_factor;
   }
   int n_bins = bases / bases_per_bin;
-  printf("bases_per_bin=%d\n", bases_per_bin);
+  printf("n_bins=%d bases_per_bin=%d\n", n_bins, bases_per_bin);
   // sample_*_mat variables are matrices n_bins x n_samples (in
   // contrast to model_*_mat which are n_bins x n_segments=3).
   int *sample_count_mat = (int*) malloc(n_bins * n_samples * sizeof(int));
