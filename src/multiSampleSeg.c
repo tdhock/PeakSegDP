@@ -135,6 +135,9 @@ multiSampleSegHeuristic(
 		    profile->coverage, profile->n_entries,
 		    sample_count_mat + n_bins*sample_i,
 		    bases_per_bin, n_bins, max_chromStart);
+    if(status != 0){
+      return status;
+    }
   }//for sample_i
   int bin_i, offset;
   int *count_vec, *cumsum_vec, cumsum_value;
@@ -234,22 +237,26 @@ multiSampleSegHeuristic(
 		    left_count_mat + n_bins_zoom*sample_i,
 		    bases_per_bin_zoom, n_bins_zoom, 
 		    left_chromStart);
+    if(status != 0){
+      return status;
+    }
     status = binSum(profile->chromStart, profile->chromEnd,
 		    profile->coverage, profile->n_entries,
 		    right_count_mat + n_bins_zoom*sample_i,
 		    bases_per_bin_zoom, n_bins_zoom, 
 		    right_chromStart);
-    for(sample_i=0; sample_i < n_samples; sample_i++){
-      left_cumsum_value = sample_cumsum_mat[n_bins*sample_i+seg1_LastIndex];
-      left_cumsum_mat[n_cumsum_zoom*sample_i] = left_cumsum_value;
-      right_cumsum_value = sample_cumsum_mat[n_bins*sample_i+seg2_LastIndex];
-      right_cumsum_mat[n_cumsum_zoom*sample_i] = right_cumsum_value;
-      for(bin_i=0; bin_i < n_bins_zoom; bin_i++){
-	left_cumsum_value += left_count_mat[n_bins_zoom*sample_i + bin_i];
-	left_cumsum_mat[n_cumsum_zoom*sample_i+bin_i+1] = left_cumsum_value;
-	right_cumsum_value += right_count_mat[n_bins_zoom*sample_i + bin_i];
-	right_cumsum_mat[n_cumsum_zoom*sample_i+bin_i+1] = right_cumsum_value;
-      }
+    if(status != 0){
+      return status;
+    }
+    left_cumsum_value = sample_cumsum_mat[n_bins*sample_i+seg1_LastIndex];
+    left_cumsum_mat[n_cumsum_zoom*sample_i] = left_cumsum_value;
+    right_cumsum_value = sample_cumsum_mat[n_bins*sample_i+seg2_LastIndex];
+    right_cumsum_mat[n_cumsum_zoom*sample_i] = right_cumsum_value;
+    for(bin_i=0; bin_i < n_bins_zoom; bin_i++){
+      left_cumsum_value += left_count_mat[n_bins_zoom*sample_i + bin_i];
+      left_cumsum_mat[n_cumsum_zoom*sample_i+bin_i+1] = left_cumsum_value;
+      right_cumsum_value += right_count_mat[n_bins_zoom*sample_i + bin_i];
+      right_cumsum_mat[n_cumsum_zoom*sample_i+bin_i+1] = right_cumsum_value;
     }
   }//for sample_i
 
