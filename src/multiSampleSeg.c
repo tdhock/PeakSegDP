@@ -259,6 +259,19 @@ multiSampleSegHeuristic(
       right_cumsum_mat[n_cumsum_zoom*sample_i+bin_i+1] = right_cumsum_value;
     }
   }//for sample_i
+  
+  double bases_value;
+  for(seg2_FirstIndex=1; seg2_FirstIndex <= n_bins_zoom; seg2_FirstIndex++){
+    seg1_LastIndex = seg2_firstIndex-1;
+    seg1_loss_value = 0.0;
+    for(sample_i=0; sample_i < n_samples; sample_i++){
+      cumsum_value = left_cumsum_value[n_bins_zoom*sample_i+seg1_LastIndex];
+      bases_value = left_chromStart - max_chromStart + 
+	seg1_LastIndex*bases_per_bin_zoom;
+      mean_value = ((double)cumsum_value)/bases_value;
+      seg1_loss_value += OptimalPoissonLoss(cumsum_value, mean_value);
+    }
+  }
 
   //cleanup!
   free(left_count_mat);
