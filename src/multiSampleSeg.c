@@ -20,6 +20,19 @@ double OptimalPoissonLoss(int cumsum_value, double mean_value){
   return cumsum_value * (1-log(mean_value));
 }
 
+/*
+  solver for the DPA recursion: 
+  L_{s,t} = min_{t' < t} L_{s-1, t'} + c_(t', t]
+  where L is the optimal loss in s segments up to t
+  and c is the optimal loss of segment (t', t]
+
+  - PrevSegs_loss_vec is the L_{s-1} vector,
+  - sample_cumsum_mat is the matrix of cumsums
+    which is used to compute the optimal loss c.
+  - first_possible_index = s.
+  - last_possible_index = t.
+  - LastSeg_FirstIndex = t'.
+ */
 void get_best_FirstIndex(
   double *PrevSegs_loss_vec, // n_data
   int n_data,
@@ -38,10 +51,14 @@ void get_best_FirstIndex(
   for(LastSeg_FirstIndex = first_possible_index; 
       LastSeg_FirstIndex <= last_possible_index;
       LastSeg_FirstIndex++){
-    // start with previuos segment optimal loss.
+    // start with previous segment optimal loss.
     candidate_loss = PrevSegs_loss_vec[LastSeg_FirstIndex-1];
     for(sample_i=0; sample_i < n_samples; sample_i++){
       cumsum_vec = sample_cumsum_mat + n_data * sample_i;
+      /*  
+	  the optimal loss of segment (t', t]
+	  can be computed in O(1) time given the vector of cumsums.
+      */
       cumsum_value = cumsum_vec[last_possible_index] - 
 	cumsum_vec[LastSeg_FirstIndex-1];
       mean_value = ((double)cumsum_value)/
@@ -56,7 +73,12 @@ void get_best_FirstIndex(
   }
 }
 
-
+/*
+  Fast heuristic solver for the multiple samples with 1 shared peak
+  problem. The sub-optimality parameter bin_factor is used to
+  down-sample the profiles, which results in a faster segmentation
+  problem.
+ */
 int
 multiSampleSegHeuristic(
   struct Profile **samples,
