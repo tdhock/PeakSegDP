@@ -35,11 +35,13 @@ multiSampleSegHeuristic <- structure(function
                 chromEnd < 118100000 &
                 sample.id %in% c("McGill0002", "McGill0004"))
   ## Find the best peak location across 2 samples.
-  optimal.seconds <- system.time({
-    optimal <- multiSampleSegOptimal(two)
-  })[["elapsed"]]
+
+  ## optimal.seconds <- system.time({
+  ##   optimal <- multiSampleSegOptimal(two)
+  ## })[["elapsed"]]
+  optimal <- data.frame(chromStart=NA, chromEnd=NA)
   heuristic.seconds <- system.time({
-    heuristic <- multiSampleSegHeuristic(two, 10)
+    heuristic <- multiSampleSegHeuristic(two, 2)
   })[["elapsed"]]
   rbind(heuristic.seconds, optimal.seconds)
   peaks <-
@@ -65,7 +67,7 @@ multiSampleSegHeuristic <- structure(function
     optimal <- multiSampleSegOptimal(four)
   })[["elapsed"]]
   heuristic.seconds <- system.time({
-    heuristic <- multiSampleSegHeuristic(four, 10)
+    heuristic <- multiSampleSegHeuristic(four, 2)
   })[["elapsed"]]
   rbind(heuristic.seconds, optimal.seconds)
   peaks <-

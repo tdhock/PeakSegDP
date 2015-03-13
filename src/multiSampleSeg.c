@@ -219,116 +219,151 @@ multiSampleSegHeuristic(
   int peakStart = max_chromStart + bases_per_bin * seg2_FirstIndex;
   int peakEnd = max_chromStart + bases_per_bin * seg3_FirstIndex;
 
-  //Now we zoom in, and search on the left and right bins.
-  int bases_per_bin_zoom = bases_per_bin / bin_factor;
-  printf("bases/bin (zoom)=%d\n", bases_per_bin_zoom);
-  int left_chromStart = peakStart - bases_per_bin;
-  int right_chromStart = peakEnd - bases_per_bin;
-  // one bin before and after estimated start/end:
   int n_bins_zoom = bin_factor * 2; 
+  int n_cumsum_zoom = n_bins_zoom + 1;
   int *left_count_mat = (int*) malloc(n_bins_zoom * n_samples * sizeof(int));
   int *right_count_mat = (int*) malloc(n_bins_zoom * n_samples * sizeof(int));
-  int n_cumsum_zoom = n_bins_zoom + 1;
   int *left_cumsum_mat = (int*) malloc(
     n_cumsum_zoom * n_samples * sizeof(int));
   int *right_cumsum_mat = (int*) malloc(
     n_cumsum_zoom * n_samples * sizeof(int));
+
+  int *left_cumsum_vec = (int*) malloc(n_samples * sizeof(int));
+  int *right_cumsum_vec = (int*) malloc(n_samples * sizeof(int));
   int left_cumsum_value, right_cumsum_value;
   for(sample_i=0; sample_i < n_samples; sample_i++){
-    profile = samples[sample_i];
-    status = binSum(profile->chromStart, profile->chromEnd,
-		    profile->coverage, profile->n_entries,
-		    left_count_mat + n_bins_zoom*sample_i,
-		    bases_per_bin_zoom, n_bins_zoom, 
-		    left_chromStart);
-    if(status != 0){
-      return status;
-    }
-    status = binSum(profile->chromStart, profile->chromEnd,
-		    profile->coverage, profile->n_entries,
-		    right_count_mat + n_bins_zoom*sample_i,
-		    bases_per_bin_zoom, n_bins_zoom, 
-		    right_chromStart);
-    if(status != 0){
-      return status;
-    }
     if(seg1_LastIndex > 0){
-      left_cumsum_value = sample_cumsum_mat[n_bins*sample_i+seg1_LastIndex-1];
-    }else{
-      left_cumsum_value = 0;
+      left_cumsum_vec[sample_i] = 
+	sample_cumsum_mat[n_bins*sample_i+seg1_LastIndex-1];
+    }else{ // there is no data before the first data point.
+      left_cumsum_vec[sample_i] = 0;
     }
-    left_cumsum_mat[n_cumsum_zoom*sample_i] = left_cumsum_value;
-    right_cumsum_value = sample_cumsum_mat[n_bins*sample_i+seg2_LastIndex-1];
-    right_cumsum_mat[n_cumsum_zoom*sample_i] = right_cumsum_value;
-    /*
-    printf("sample=%d left=%d right=%d\n", 
-	   sample_i, left_cumsum_value, right_cumsum_value);
-    */
-    for(bin_i=0; bin_i < n_bins_zoom; bin_i++){
-      left_cumsum_value += left_count_mat[n_bins_zoom*sample_i + bin_i];
-      left_cumsum_mat[n_cumsum_zoom*sample_i+bin_i+1] = left_cumsum_value;
-      right_cumsum_value += right_count_mat[n_bins_zoom*sample_i + bin_i];
-      //printf("left=%d right=%d\n", left_cumsum_value, right_cumsum_value);
-      right_cumsum_mat[n_cumsum_zoom*sample_i+bin_i+1] = right_cumsum_value;
-    }
-  }//for sample_i
-  
-  double bases_value, seg1_loss_value;
-  int best_seg2_FirstIndex, best_seg3_FirstIndex, 
-    seg2_chromEnd, seg1_chromEnd, after_cumsum,
-    last_bin_cumsum, cumsum_seg2_end;
-  min_loss = INFINITY;
-  for(seg2_FirstIndex=1; seg2_FirstIndex <= n_bins_zoom; seg2_FirstIndex++){
-    seg1_LastIndex = seg2_FirstIndex-1;
-    seg1_chromEnd = left_chromStart + seg1_LastIndex*bases_per_bin_zoom;
-    seg1_loss = 0.0;
-    for(sample_i=0; sample_i < n_samples; sample_i++){
-      cumsum_value = left_cumsum_mat[n_cumsum_zoom*sample_i+seg1_LastIndex];
-      bases_value = seg1_chromEnd - max_chromStart;
-      mean_value = ((double)cumsum_value)/bases_value;
-      seg1_loss += OptimalPoissonLoss(cumsum_value, mean_value);
-    }
-    for(seg3_FirstIndex=1; seg3_FirstIndex <= n_bins_zoom; seg3_FirstIndex++){
-      seg2_LastIndex = seg3_FirstIndex -1;
-      seg2_chromEnd = right_chromStart + seg2_LastIndex*bases_per_bin_zoom;
-      if(seg1_chromEnd < seg2_chromEnd){
-	seg2_loss = 0.0;
-	seg3_loss = 0.0;
-	for(sample_i=0; sample_i < n_samples; sample_i++){
-	  // first compute seg2_loss.
-	  cumsum_seg2_end = right_cumsum_mat[
-	    n_cumsum_zoom*sample_i+seg2_LastIndex];
-	  cumsum_value = cumsum_seg2_end-
-	    left_cumsum_mat[n_cumsum_zoom*sample_i+seg1_LastIndex];
-	  bases_value = seg2_chromEnd - seg1_chromEnd;	  
-	  mean_value = ((double)cumsum_value)/bases_value;
-	  seg2_loss += OptimalPoissonLoss(cumsum_value, mean_value);
-	  // then compute seg3_loss.
-	  last_bin_cumsum = sample_cumsum_mat[n_bins*(sample_i+1)-1];
-	  //after_cumsum = -
-	  cumsum_value = last_bin_cumsum - cumsum_seg2_end;
-	  bases_value = min_chromEnd - seg2_chromEnd;
-	  mean_value = ((double)cumsum_value)/bases_value;
-	  seg3_loss += OptimalPoissonLoss(cumsum_value, mean_value);
-	}
-	candidate_loss = seg1_loss + seg2_loss + seg3_loss;
-	if(candidate_loss < min_loss){
-	  min_loss = candidate_loss;
-	  best_seg2_FirstIndex = seg2_FirstIndex;
-	  best_seg3_FirstIndex = seg3_FirstIndex;
-	}
-      }
-    }
+    right_cumsum_vec[sample_i] = 
+      sample_cumsum_mat[n_bins*sample_i+seg2_LastIndex-1];
   }
-  //printf("%d %d\n", best_seg2_FirstIndex, best_seg3_FirstIndex);
-  peakStart = left_chromStart + bases_per_bin_zoom * (best_seg2_FirstIndex-1);
-  peakEnd = right_chromStart + bases_per_bin_zoom * (best_seg3_FirstIndex-1);
+
+  //Now we zoom in, and search on the left and right bins.
+  int bases_per_bin_zoom = bases_per_bin;
+  while(bases_per_bin_zoom > 1){
+    int left_chromStart = peakStart - bases_per_bin_zoom;
+    int right_chromStart = peakEnd - bases_per_bin_zoom;
+    // Important to determine chromStart before!
+    bases_per_bin_zoom /= bin_factor;
+    printf("bases/bin (zoom)=%d [%d,%d]\n", 
+	   bases_per_bin_zoom,
+	   peakStart,
+	   peakEnd);
+    // one bin before and after estimated start/end:
+    for(sample_i=0; sample_i < n_samples; sample_i++){
+      profile = samples[sample_i];
+      status = binSum(profile->chromStart, profile->chromEnd,
+		      profile->coverage, profile->n_entries,
+		      left_count_mat + n_bins_zoom*sample_i,
+		      bases_per_bin_zoom, n_bins_zoom, 
+		      left_chromStart);
+      if(status != 0){
+	return status;
+      }
+      status = binSum(profile->chromStart, profile->chromEnd,
+		      profile->coverage, profile->n_entries,
+		      right_count_mat + n_bins_zoom*sample_i,
+		      bases_per_bin_zoom, n_bins_zoom, 
+		      right_chromStart);
+      if(status != 0){
+	return status;
+      }
+      left_cumsum_value = left_cumsum_vec[sample_i];
+      left_cumsum_mat[n_cumsum_zoom*sample_i] = left_cumsum_value;
+      right_cumsum_value = right_cumsum_vec[sample_i];
+      right_cumsum_mat[n_cumsum_zoom*sample_i] = right_cumsum_value;
+      for(bin_i=0; bin_i < n_bins_zoom; bin_i++){
+	left_cumsum_value += left_count_mat[n_bins_zoom*sample_i + bin_i];
+	left_cumsum_mat[n_cumsum_zoom*sample_i+bin_i+1] = left_cumsum_value;
+	right_cumsum_value += right_count_mat[n_bins_zoom*sample_i + bin_i];
+	right_cumsum_mat[n_cumsum_zoom*sample_i+bin_i+1] = right_cumsum_value;
+      }
+    }//for sample_i
+  
+    double bases_value, seg1_loss_value;
+    int best_seg2_FirstIndex, best_seg3_FirstIndex, 
+      seg2_chromEnd, seg1_chromEnd, after_cumsum,
+      last_bin_cumsum, cumsum_seg2_end;
+    min_loss = INFINITY;
+    /* 
+       the first possible seg2_FirstIndex value is in fact 2.
+       - not 0 since that is the cumsum before,
+       - and not 1, since if that was optimal then we 
+         would not know the cumsum before in the next step.
+	 for example consider bin_factor=2:
+	 [     |     |     |     |     |     |     |     ] original bins
+	             [                 ] best peak
+	       [1 |2 |3 |4 ]     [1 |2 |3 |4 ] possible starts/ends.
+	       [     ] seg2_FirstIndex=2 is fine
+	                [     ] seg2_FirstIndex=4 is fine
+	    [     ] seg2_FirstIndex=1 NOT OK -- unknown cumsum before.
+	    so in this case 3 possible starts (2-4),
+	    and 4 possible ends (1-4).
+    */
+    for(seg2_FirstIndex=2; seg2_FirstIndex <= n_bins_zoom; seg2_FirstIndex++){
+      seg1_LastIndex = seg2_FirstIndex-1;
+      seg1_chromEnd = left_chromStart + seg1_LastIndex*bases_per_bin_zoom;
+      seg1_loss = 0.0;
+      for(sample_i=0; sample_i < n_samples; sample_i++){
+	cumsum_value = left_cumsum_mat[n_cumsum_zoom*sample_i+seg1_LastIndex];
+	bases_value = seg1_chromEnd - max_chromStart;
+	mean_value = ((double)cumsum_value)/bases_value;
+	seg1_loss += OptimalPoissonLoss(cumsum_value, mean_value);
+      }
+      for(seg3_FirstIndex=1; seg3_FirstIndex <= n_bins_zoom; seg3_FirstIndex++){
+	seg2_LastIndex = seg3_FirstIndex -1;
+	seg2_chromEnd = right_chromStart + seg2_LastIndex*bases_per_bin_zoom;
+	if(seg1_chromEnd < seg2_chromEnd){
+	  seg2_loss = 0.0;
+	  seg3_loss = 0.0;
+	  for(sample_i=0; sample_i < n_samples; sample_i++){
+	    // first compute seg2_loss.
+	    cumsum_seg2_end = right_cumsum_mat[
+	      n_cumsum_zoom*sample_i+seg2_LastIndex];
+	    cumsum_value = cumsum_seg2_end-
+	      left_cumsum_mat[n_cumsum_zoom*sample_i+seg1_LastIndex];
+	    bases_value = seg2_chromEnd - seg1_chromEnd;	  
+	    mean_value = ((double)cumsum_value)/bases_value;
+	    seg2_loss += OptimalPoissonLoss(cumsum_value, mean_value);
+	    // then compute seg3_loss.
+	    last_bin_cumsum = sample_cumsum_mat[n_bins*(sample_i+1)-1];
+	    //after_cumsum = -
+	    cumsum_value = last_bin_cumsum - cumsum_seg2_end;
+	    bases_value = min_chromEnd - seg2_chromEnd;
+	    mean_value = ((double)cumsum_value)/bases_value;
+	    seg3_loss += OptimalPoissonLoss(cumsum_value, mean_value);
+	  }
+	  candidate_loss = seg1_loss + seg2_loss + seg3_loss;
+	  if(candidate_loss < min_loss){
+	    min_loss = candidate_loss;
+	    best_seg2_FirstIndex = seg2_FirstIndex;
+	    best_seg3_FirstIndex = seg3_FirstIndex;
+	  }
+	}
+      }//seg3_FirstIndex
+    }//seg2_FirstIndex
+    printf("best first indices %d %d\n", best_seg2_FirstIndex, best_seg3_FirstIndex);
+    for(sample_i=0; sample_i < n_samples; sample_i++){
+      left_cumsum_vec[sample_i] = left_cumsum_mat[
+	n_cumsum_zoom*sample_i+best_seg2_FirstIndex-2];
+      right_cumsum_vec[sample_i] = right_cumsum_mat[
+	n_cumsum_zoom*sample_i+best_seg3_FirstIndex-1];
+    }
+    peakStart = left_chromStart + bases_per_bin_zoom * (best_seg2_FirstIndex-1);
+    peakEnd = right_chromStart + bases_per_bin_zoom * (best_seg3_FirstIndex-1);
+  }
 
   //cleanup!
   free(left_count_mat);
   free(right_count_mat);
   free(left_cumsum_mat);
   free(right_cumsum_mat);
+  free(left_cumsum_vec);
+  free(right_cumsum_vec);
   free(seg12_loss_vec);
   free(seg1_loss_vec);
   free(seg2_first_vec);
