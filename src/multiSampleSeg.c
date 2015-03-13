@@ -102,67 +102,92 @@ multiSampleSegHeuristic(
       /* 	     ((double)count_vec[bin_i])/((double)bases_per_bin)); */
     }
   }
-  int maxSegments = 3;
-  double *model_loss_mat = (double*) malloc(
-    n_bins * maxSegments * sizeof(double));
-  int *model_first_mat = (int*) malloc(
-    n_bins * maxSegments * sizeof(int));
+  /*
+    First step of DPA: compute optimal loss for 1 segment up to data
+    point t, for all data points = bins.
+  */
+  double *seg1_loss_vec = (double*) malloc(n_bins * sizeof(double));
   for(bin_i=0; bin_i < n_bins; bin_i++){
-    model_loss_mat[bin_i] = 0;
+    seg1_loss_vec[bin_i] = 0;
     for(sample_i=0; sample_i < n_samples; sample_i++){
-      model_loss_mat[bin_i] += sample_loss1_mat[bin_i + n_bins*sample_i];
+      seg1_loss_vec[bin_i] += sample_loss1_mat[bin_i + n_bins*sample_i];
     }
   }
-  int segment_i, LastSeg_FirstIndex, LastSeg_LastIndex, best_FirstIndex;
-  double prev_loss, min_loss, LastSeg_loss, candidate_loss;
-  for(segment_i=1; segment_i < maxSegments; segment_i++){
-    for(LastSeg_LastIndex=segment_i; 
-	LastSeg_LastIndex < n_bins; 
-	LastSeg_LastIndex++){
-      min_loss = INFINITY;
-      for(LastSeg_FirstIndex=segment_i; 
-	  LastSeg_FirstIndex <= LastSeg_LastIndex;
-	  LastSeg_FirstIndex++){
-	prev_loss = model_loss_mat[LastSeg_FirstIndex-1 + n_bins*(segment_i-1)];
-	LastSeg_loss = 0.0;
-	for(sample_i=0; sample_i < n_samples; sample_i++){
-	  cumsum_vec = sample_cumsum_mat + n_bins * sample_i;
-	  cumsum_value = cumsum_vec[LastSeg_LastIndex] - 
-	    cumsum_vec[LastSeg_FirstIndex-1];
-	  mean_value = ((double)cumsum_value)/
-	    ((double)LastSeg_LastIndex-LastSeg_FirstIndex+1);
-	  LastSeg_loss += OptimalPoissonLoss(cumsum_value, mean_value);
-	}
-	candidate_loss = LastSeg_loss + prev_loss;
-	if(candidate_loss < min_loss){
-	  min_loss = candidate_loss;
-	  best_FirstIndex = LastSeg_FirstIndex;
-	}
+  /* 
+     Second step of DPA: compute optimal loss in 2 segments up to data
+     point t, for all data points = bins.
+   */
+  double *seg12_loss_vec = (double*) malloc(n_bins * sizeof(double));
+  int *seg2_first_vec = (int*) malloc(n_bins * sizeof(int));
+  int seg2_FirstIndex, seg2_LastIndex, best_FirstIndex;
+  double seg1_loss, min_loss, seg2_loss, candidate_loss;
+  for(seg2_LastIndex=1; 
+      seg2_LastIndex < n_bins; 
+      seg2_LastIndex++){
+    min_loss = INFINITY;
+    for(seg2_FirstIndex=1; 
+	seg2_FirstIndex <= seg2_LastIndex;
+	seg2_FirstIndex++){
+      seg1_loss = seg1_loss_vec[seg2_FirstIndex-1];
+      seg2_loss = 0.0;
+      for(sample_i=0; sample_i < n_samples; sample_i++){
+	cumsum_vec = sample_cumsum_mat + n_bins * sample_i;
+	cumsum_value = cumsum_vec[seg2_LastIndex] - 
+	  cumsum_vec[seg2_FirstIndex-1];
+	mean_value = ((double)cumsum_value)/
+	  ((double)seg2_LastIndex-seg2_FirstIndex+1);
+	seg2_loss += OptimalPoissonLoss(cumsum_value, mean_value);
       }
-      model_first_mat[LastSeg_LastIndex + n_bins*segment_i] = best_FirstIndex;
-      model_loss_mat[LastSeg_LastIndex + n_bins*segment_i] = min_loss;
+      candidate_loss = seg2_loss + seg1_loss;
+      if(candidate_loss < min_loss){
+	min_loss = candidate_loss;
+	best_FirstIndex = seg2_FirstIndex;
+      }
+    }
+    seg2_first_vec[seg2_LastIndex] = best_FirstIndex;
+    seg12_loss_vec[seg2_LastIndex] = min_loss;
+  }
+  /*
+    For the best segmentation in 3 segments up to n_bins-1, the first
+    index of the 3rd segment is computed using the following code. No
+    need for a for loop on seg3_LastIndex, since we only want to know
+    the optimal model which ends at the last data point = bin (we are
+    not continuing the DPA past 3 segments).
+  */
+  int seg3_LastIndex = n_bins-1;
+  int seg3_FirstIndex;
+  int seg12_loss, seg3_loss;
+  min_loss = INFINITY;
+  for(seg3_FirstIndex=2; 
+      seg3_FirstIndex <= seg3_LastIndex;
+      seg3_FirstIndex++){
+    seg12_loss = seg12_loss_vec[seg2_FirstIndex-1];
+    seg3_loss = 0.0;
+    for(sample_i=0; sample_i < n_samples; sample_i++){
+      cumsum_vec = sample_cumsum_mat + n_bins * sample_i;
+      cumsum_value = cumsum_vec[seg3_LastIndex] - 
+	cumsum_vec[seg3_FirstIndex-1];
+      mean_value = ((double)cumsum_value)/
+	((double)seg3_LastIndex-seg3_FirstIndex+1);
+      seg3_loss += OptimalPoissonLoss(cumsum_value, mean_value);
+    }
+    candidate_loss = seg12_loss + seg3_loss;
+    if(candidate_loss < min_loss){
+      min_loss = candidate_loss;
+      best_FirstIndex = seg3_FirstIndex;
     }
   }
-  // For the best segmentation in 3 segments up to n_bins-1, the first
-  // index of the 3rd segment is
-  int seg3_FirstIndex = model_first_mat[n_bins*3-1];
-  int seg2_LastIndex = seg3_FirstIndex-1;
-  int seg2_FirstIndex = model_first_mat[n_bins*1+seg2_LastIndex];
+  seg3_FirstIndex = best_FirstIndex;
+  seg2_LastIndex = seg3_FirstIndex-1;
+  seg2_FirstIndex = seg2_first_vec[seg2_LastIndex];
+  /*
+  printf("[0,%d] [%d,%d] [%d,%d]\n",
+	 seg2_FirstIndex-1,
+	 seg2_FirstIndex, seg2_LastIndex,
+	 seg3_FirstIndex, n_bins-1);
+  */
   int peakStart = max_chromStart + bases_per_bin * seg2_FirstIndex;
   int peakEnd = max_chromStart + bases_per_bin * seg3_FirstIndex;
-
-  /* printf("[0,%d] [%d,%d] [%d,%d]\n", */
-  /* 	 seg2_FirstIndex-1, */
-  /* 	 seg2_FirstIndex, seg2_LastIndex, */
-  /* 	 seg3_FirstIndex, n_bins-1); */
-
-  /* for(bin_i=0; bin_i < n_bins; bin_i++){ */
-  /*   printf("bin_i=%3d", bin_i); */
-  /*   for(segment_i=1; segment_i < 3; segment_i++){ */
-  /*     printf(" %d", model_first_mat[bin_i + n_bins * segment_i]); */
-  /*   } */
-  /*   printf("\n"); */
-  /* } */
 
   //Now we zoom in, and search on the left and right bins.
   int zoom_bases = bases_per_bin * 2;
@@ -179,10 +204,12 @@ multiSampleSegHeuristic(
   }
   int *left_count_mat = (int*) malloc(n_bins * n_samples * sizeof(int));
   int *right_count_mat = (int*) malloc(n_bins * n_samples * sizeof(int));
+  /*
   printf("[%d,%d] [%d,%d] zoom_bases=%d zoom_bases_per_bin=%d\n",
 	 left_chromStart, left_chromStart + zoom_bases,
 	 right_chromStart, right_chromStart + zoom_bases,
 	 zoom_bases, zoom_bases_per_bin);
+  */
   for(sample_i=0; sample_i < n_samples; sample_i++){
     profile = samples[sample_i];
     status = binSum(profile->chromStart, profile->chromEnd,
@@ -198,8 +225,9 @@ multiSampleSegHeuristic(
   //cleanup!
   free(left_count_mat);
   free(right_count_mat);
-  free(model_loss_mat);
-  free(model_first_mat);
+  free(seg12_loss_vec);
+  free(seg1_loss_vec);
+  free(seg2_first_vec);
   free(sample_count_mat);
   free(sample_cumsum_mat);
   free(sample_mean1_mat);
