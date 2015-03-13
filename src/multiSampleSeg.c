@@ -128,10 +128,6 @@ multiSampleSegHeuristic(
   // contrast to model_*_mat which are n_bins x n_segments=3).
   int *sample_count_mat = (int*) malloc(n_bins * n_samples * sizeof(int));
   int *sample_cumsum_mat = (int*) malloc(n_bins * n_samples * sizeof(int));
-  double *sample_mean1_mat = (double*) malloc(
-    n_bins * n_samples * sizeof(double));
-  double *sample_loss1_mat = (double*) malloc(
-    n_bins * n_samples * sizeof(double));
   int status;
   for(sample_i=0; sample_i < n_samples; sample_i++){
     profile = samples[sample_i];
@@ -142,23 +138,15 @@ multiSampleSegHeuristic(
   }//for sample_i
   int bin_i, offset;
   int *count_vec, *cumsum_vec, cumsum_value;
-  double *mean_vec, *loss_vec, mean_value, loss_value;
+  double *loss_vec, mean_value, loss_value;
   for(sample_i=0; sample_i < n_samples; sample_i++){
     cumsum_value = 0;
     offset = n_bins * sample_i;
     count_vec = sample_count_mat + offset;
     cumsum_vec = sample_cumsum_mat + offset;
-    mean_vec = sample_mean1_mat + offset;
-    loss_vec = sample_loss1_mat + offset;
     for(bin_i=0; bin_i < n_bins; bin_i++){
       cumsum_value += count_vec[bin_i];
       cumsum_vec[bin_i] = cumsum_value;
-      mean_value = ((double) cumsum_value) / ((double)bin_i+1);
-      mean_vec[bin_i] = mean_value;
-      loss_vec[bin_i] = OptimalPoissonLoss(cumsum_value, mean_value);
-      /* printf("[%3d,%3d]=%d %f %f\n", sample_i, bin_i,  */
-      /* 	     cumsum_value, mean_value,  */
-      /* 	     ((double)count_vec[bin_i])/((double)bases_per_bin)); */
     }
   }
   /*
@@ -169,7 +157,10 @@ multiSampleSegHeuristic(
   for(bin_i=0; bin_i < n_bins; bin_i++){
     seg1_loss_vec[bin_i] = 0;
     for(sample_i=0; sample_i < n_samples; sample_i++){
-      seg1_loss_vec[bin_i] += sample_loss1_mat[bin_i + n_bins*sample_i];
+      cumsum_value = sample_cumsum_mat[n_bins*sample_i+bin_i];
+      mean_value = ((double) cumsum_value) / ((double)bin_i+1);
+      loss_value = OptimalPoissonLoss(cumsum_value, mean_value);
+      seg1_loss_vec[bin_i] += loss_value;
     }
   }
   /* 
@@ -213,28 +204,65 @@ multiSampleSegHeuristic(
     &best_loss);
   seg2_LastIndex = seg3_FirstIndex-1;
   seg2_FirstIndex = seg2_first_vec[seg2_LastIndex];
+  int seg1_LastIndex = seg2_FirstIndex-1;
   printf("[0,%d] [%d,%d] [%d,%d]\n",
-	 seg2_FirstIndex-1,
+	 seg1_LastIndex,
 	 seg2_FirstIndex, seg2_LastIndex,
 	 seg3_FirstIndex, n_bins-1);
   int peakStart = max_chromStart + bases_per_bin * seg2_FirstIndex;
   int peakEnd = max_chromStart + bases_per_bin * seg3_FirstIndex;
 
   //Now we zoom in, and search on the left and right bins.
-  int *left_count_mat = (int*) malloc(n_bins * n_samples * sizeof(int));
-  int *right_count_mat = (int*) malloc(n_bins * n_samples * sizeof(int));
-  printf("next bases/bin=%d\n", bases_per_bin / bin_factor);
+  int bases_per_bin_zoom = bases_per_bin / bin_factor;
+  printf("bases/bin (zoom)=%d\n", bases_per_bin_zoom);
+  int left_chromStart = peakStart - bases_per_bin;
+  int right_chromStart = peakEnd - bases_per_bin;
+  // one bin before and after estimated start/end:
+  int n_bins_zoom = bin_factor * 2; 
+  int *left_count_mat = (int*) malloc(n_bins_zoom * n_samples * sizeof(int));
+  int *right_count_mat = (int*) malloc(n_bins_zoom * n_samples * sizeof(int));
+  int n_cumsum_zoom = n_bins_zoom + 1;
+  int *left_cumsum_mat = (int*) malloc(
+    n_cumsum_zoom * n_samples * sizeof(int));
+  int *right_cumsum_mat = (int*) malloc(
+    n_cumsum_zoom * n_samples * sizeof(int));
+  int left_cumsum_value, right_cumsum_value;
+  for(sample_i=0; sample_i < n_samples; sample_i++){
+    profile = samples[sample_i];
+    status = binSum(profile->chromStart, profile->chromEnd,
+		    profile->coverage, profile->n_entries,
+		    left_count_mat + n_bins_zoom*sample_i,
+		    bases_per_bin_zoom, n_bins_zoom, 
+		    left_chromStart);
+    status = binSum(profile->chromStart, profile->chromEnd,
+		    profile->coverage, profile->n_entries,
+		    right_count_mat + n_bins_zoom*sample_i,
+		    bases_per_bin_zoom, n_bins_zoom, 
+		    right_chromStart);
+    for(sample_i=0; sample_i < n_samples; sample_i++){
+      left_cumsum_value = sample_cumsum_mat[n_bins*sample_i+seg1_LastIndex];
+      left_cumsum_mat[n_cumsum_zoom*sample_i] = left_cumsum_value;
+      right_cumsum_value = sample_cumsum_mat[n_bins*sample_i+seg2_LastIndex];
+      right_cumsum_mat[n_cumsum_zoom*sample_i] = right_cumsum_value;
+      for(bin_i=0; bin_i < n_bins_zoom; bin_i++){
+	left_cumsum_value += left_count_mat[n_bins_zoom*sample_i + bin_i];
+	left_cumsum_mat[n_cumsum_zoom*sample_i+bin_i+1] = left_cumsum_value;
+	right_cumsum_value += right_count_mat[n_bins_zoom*sample_i + bin_i];
+	right_cumsum_mat[n_cumsum_zoom*sample_i+bin_i+1] = right_cumsum_value;
+      }
+    }
+  }//for sample_i
 
   //cleanup!
   free(left_count_mat);
   free(right_count_mat);
+  free(left_cumsum_mat);
+  free(right_cumsum_mat);
   free(seg12_loss_vec);
   free(seg1_loss_vec);
   free(seg2_first_vec);
   free(sample_count_mat);
   free(sample_cumsum_mat);
-  free(sample_mean1_mat);
-  free(sample_loss1_mat);
   optimal_start_end[0] = peakStart;
   optimal_start_end[1] = peakEnd;
   return 0;
