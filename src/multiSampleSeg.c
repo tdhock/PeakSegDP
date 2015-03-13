@@ -4,7 +4,14 @@
 #include "binSum.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
+
+int get_min_chromStart(struct Profile *profile){
+  return profile->chromStart[0];
+}
+
+int get_max_chromEnd(struct Profile *profile){
+  return profile->chromEnd[profile->n_entries-1];
+}
 
 double OptimalPoissonLoss(int cumsum_value, double mean_value){
   if(cumsum_value == 0){
@@ -14,10 +21,10 @@ double OptimalPoissonLoss(int cumsum_value, double mean_value){
 }
 
 int
-multiSampleSeg(
+multiSampleSegHeuristic(
   struct Profile **samples,
   int n_samples,
-  int n_bins,
+  int bin_factor,
   int *optimal_start_end // array of length 2.
   ) {
   int sample_i, coverage_i, min_chromEnd, max_chromStart,
@@ -42,11 +49,22 @@ multiSampleSeg(
     //}
   }
   int bases = min_chromEnd - max_chromStart;
-  int bases_per_bin = bases/n_bins;
-  printf("bases_per_bin=%d\n", bases_per_bin);
-  if(bases <= n_bins){
-    return ERROR_FEWER_BASES_THAN_BINS;
+  if(bases/bin_factor < 4){
+    /*
+      4 is smallest the number of data points for which the 3-segment
+      optimization problem is not trivial.
+
+      If we don't have at least this many data points for the first
+      bin step, than we stop with an error.
+    */
+    return ERROR_BIN_FACTOR_TOO_LARGE;
   }
+  int bases_per_bin = 1;
+  while(bases/bases_per_bin/bin_factor >= 4){
+    bases_per_bin *= bin_factor;
+  }
+  int n_bins = bases / bases_per_bin;
+  printf("bases_per_bin=%d\n", bases_per_bin);
   // sample_*_mat variables are matrices n_bins x n_samples (in
   // contrast to model_*_mat which are n_bins x n_segments=3).
   int *sample_count_mat = (int*) malloc(n_bins * n_samples * sizeof(int));
@@ -180,6 +198,133 @@ multiSampleSeg(
   //cleanup!
   free(left_count_mat);
   free(right_count_mat);
+  free(model_loss_mat);
+  free(model_first_mat);
+  free(sample_count_mat);
+  free(sample_cumsum_mat);
+  free(sample_mean1_mat);
+  free(sample_loss1_mat);
+  optimal_start_end[0] = peakStart;
+  optimal_start_end[1] = peakEnd;
+  return 0;
+}
+
+
+/*
+  Implements base-pair level DPA = Dynamic Programming Algorithm (not
+  constrained), in order to recover the most likely Poisson model with
+  the same 3 segments (but different mean values) on each of n_samples
+  profiles.
+ */
+int
+multiSampleSegOptimal(
+  struct Profile **samples,
+  int n_samples,
+  int *optimal_start_end // array of length 2.
+  ) {
+  int sample_i, coverage_i, min_chromEnd, max_chromStart,
+    chromStart, chromEnd;
+  struct Profile *profile;
+  profile = samples[0];
+  min_chromEnd = get_max_chromEnd(profile);
+  max_chromStart = get_min_chromStart(profile);
+  for(sample_i=1; sample_i < n_samples; sample_i++){
+    profile = samples[sample_i];
+    chromStart = get_min_chromStart(profile);
+    if(max_chromStart < chromStart){
+      max_chromStart = chromStart;
+    }
+    chromEnd = get_max_chromEnd(profile);
+    if(chromEnd < min_chromEnd){
+      min_chromEnd = chromEnd;
+    }
+  }
+  int n_bases = min_chromEnd - max_chromStart;
+
+  // sample_*_mat variables are matrices n_bases x n_samples (in
+  // contrast to model_*_mat which are n_bases x n_segments=3).
+  int *sample_count_mat = (int*) malloc(n_bases * n_samples * sizeof(int));
+  int *sample_cumsum_mat = (int*) malloc(n_bases * n_samples * sizeof(int));
+  double *sample_mean1_mat = (double*) malloc(
+    n_bases * n_samples * sizeof(double));
+  double *sample_loss1_mat = (double*) malloc(
+    n_bases * n_samples * sizeof(double));
+  int status;
+  for(sample_i=0; sample_i < n_samples; sample_i++){
+    profile = samples[sample_i];
+    status = binSum(profile->chromStart, profile->chromEnd,
+		    profile->coverage, profile->n_entries,
+		    sample_count_mat + n_bases*sample_i,
+		    1, n_bases, max_chromStart);
+  }//for sample_i
+  int base_i, offset;
+  int *count_vec, *cumsum_vec, cumsum_value;
+  double *mean_vec, *loss_vec, mean_value, loss_value;
+  for(sample_i=0; sample_i < n_samples; sample_i++){
+    cumsum_value = 0;
+    offset = n_bases * sample_i;
+    count_vec = sample_count_mat + offset;
+    cumsum_vec = sample_cumsum_mat + offset;
+    mean_vec = sample_mean1_mat + offset;
+    loss_vec = sample_loss1_mat + offset;
+    for(base_i=0; base_i < n_bases; base_i++){
+      cumsum_value += count_vec[base_i];
+      cumsum_vec[base_i] = cumsum_value;
+      mean_value = ((double) cumsum_value) / ((double)base_i+1);
+      mean_vec[base_i] = mean_value;
+      loss_vec[base_i] = OptimalPoissonLoss(cumsum_value, mean_value);
+    }
+  }
+  int maxSegments = 3;
+  double *model_loss_mat = (double*) malloc(
+    n_bases * maxSegments * sizeof(double));
+  int *model_first_mat = (int*) malloc(
+    n_bases * maxSegments * sizeof(int));
+  for(base_i=0; base_i < n_bases; base_i++){
+    model_loss_mat[base_i] = 0;
+    for(sample_i=0; sample_i < n_samples; sample_i++){
+      model_loss_mat[base_i] += sample_loss1_mat[base_i + n_bases*sample_i];
+    }
+  }
+  int segment_i, LastSeg_FirstIndex, LastSeg_LastIndex, best_FirstIndex;
+  double prev_loss, min_loss, LastSeg_loss, candidate_loss;
+  for(segment_i=1; segment_i < maxSegments; segment_i++){
+    for(LastSeg_LastIndex=segment_i; 
+	LastSeg_LastIndex < n_bases; 
+	LastSeg_LastIndex++){
+      min_loss = INFINITY;
+      for(LastSeg_FirstIndex=segment_i; 
+	  LastSeg_FirstIndex <= LastSeg_LastIndex;
+	  LastSeg_FirstIndex++){
+	prev_loss = model_loss_mat[
+	  LastSeg_FirstIndex-1 + n_bases*(segment_i-1)];
+	LastSeg_loss = 0.0;
+	for(sample_i=0; sample_i < n_samples; sample_i++){
+	  cumsum_vec = sample_cumsum_mat + n_bases * sample_i;
+	  cumsum_value = cumsum_vec[LastSeg_LastIndex] - 
+	    cumsum_vec[LastSeg_FirstIndex-1];
+	  mean_value = ((double)cumsum_value)/
+	    ((double)LastSeg_LastIndex-LastSeg_FirstIndex+1);
+	  LastSeg_loss += OptimalPoissonLoss(cumsum_value, mean_value);
+	}
+	candidate_loss = LastSeg_loss + prev_loss;
+	if(candidate_loss < min_loss){
+	  min_loss = candidate_loss;
+	  best_FirstIndex = LastSeg_FirstIndex;
+	}
+      }
+      model_first_mat[LastSeg_LastIndex + n_bases*segment_i] = best_FirstIndex;
+      model_loss_mat[LastSeg_LastIndex + n_bases*segment_i] = min_loss;
+    }
+  }
+  // For the best segmentation in 3 segments up to n_bases-1, the first
+  // index of the 3rd segment is
+  int seg3_FirstIndex = model_first_mat[n_bases*3-1];
+  int seg2_LastIndex = seg3_FirstIndex-1;
+  int seg2_FirstIndex = model_first_mat[n_bases*1+seg2_LastIndex];
+  int peakStart = max_chromStart + seg2_FirstIndex;
+  int peakEnd = max_chromStart + seg3_FirstIndex;
+
   free(model_loss_mat);
   free(model_first_mat);
   free(sample_count_mat);
