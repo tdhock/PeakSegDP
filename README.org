@@ -14,5 +14,6 @@ example(PeakSegDP)
 example(largestContinuousMinimum)
 example(binSum)
 example(clusterPeaks)
+example(multiSampleSegHeuristic)
 #+END_SRC
 

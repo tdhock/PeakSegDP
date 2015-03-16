@@ -82,7 +82,21 @@ multiSampleSegHeuristic <- structure(function
     theme(panel.margin=grid::unit(0, "cm"))+
     facet_grid(sample.id ~ ., scales="free")
 
-  ## TODO: plot microbenchmark time versus parameter.
+  ## plot microbenchmark time versus parameter.
+  library(microbenchmark)
+  m.args <- list()
+  results <- list()
+  for(param in paste(c(2, 3, 5, 10, 15, 20, 25, 30, 100, 1000))){
+    m.args[[param]] <- x <- quote({
+      results[[param]] <- multiSampleSegHeuristic(four, 2)
+    })
+    eval(x)
+  }
+  times <- microbenchmark(list=m.args)
+  ggplot()+
+    scale_x_log10()+
+    geom_point(aes(as.numeric(as.character(expr)), time/1e9),
+               data=times, pch=1)
 
   ## A fake data set with two profiles with very different scales for
   ## the count variable, showing that the profile with the small
