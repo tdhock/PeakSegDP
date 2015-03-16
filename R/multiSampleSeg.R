@@ -35,11 +35,9 @@ multiSampleSegHeuristic <- structure(function
                 chromEnd < 118100000 &
                 sample.id %in% c("McGill0002", "McGill0004"))
   ## Find the best peak location across 2 samples.
-
   optimal.seconds <- system.time({
     optimal <- multiSampleSegOptimal(two)
   })[["elapsed"]]
-  optimal <- data.frame(chromStart=NA, chromEnd=NA)
   heuristic.seconds <- system.time({
     heuristic <- multiSampleSegHeuristic(two, 2)
   })[["elapsed"]]
@@ -64,7 +62,7 @@ multiSampleSegHeuristic <- structure(function
   max.chromStart <- max(sapply(two.list, with, chromStart[1]))
   min.chromEnd <- min(sapply(two.list, with, chromEnd[length(chromEnd)]))
   bases <- min.chromEnd-max.chromStart
-  bin.factor <- 3L
+  bin.factor <- 2L
   bases.per.bin <- 1L
   while(bases/bases.per.bin/bin.factor >= 4){
     bases.per.bin <- bases.per.bin * bin.factor
@@ -279,10 +277,11 @@ multiSampleSegHeuristic <- structure(function
     left.cumsum.vec <- left.cumsum.mat[best.model$left.cumsum.row-2, ]
     right.cumsum.vec <- right.cumsum.mat[best.model$right.cumsum.row-1, ]
   }
+
+  ## Find the best peak location across 4 samples.
   four <- subset(chr11ChIPseq$coverage,
                  118120000 < chromStart &
                  chromEnd < 118126000) 
-  ## Find the best peak location across 4 samples.
   optimal.seconds <- system.time({
     optimal <- multiSampleSegOptimal(four)
   })[["elapsed"]]
