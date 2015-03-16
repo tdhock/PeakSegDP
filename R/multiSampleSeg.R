@@ -131,7 +131,40 @@ multiSampleSegHeuristic <- structure(function
     theme_bw()+
     theme(panel.margin=grid::unit(0, "cm"))+
     facet_grid(sample.id ~ .)
-  
+  peakStart <- loss.best$peakStart
+  peakEnd <- loss.best$peakEnd
+  left.cumsum.vec <- if(loss.best$seg1.last == 1){
+    rep(0, n.samples)
+  }else{
+    cumsum.mat[loss.best$seg1.last-1, ]
+  }
+  right.cumsum.vec <- cumsum.mat[loss.best$seg2.last-1, ]
+  n.bins.zoom <- bin.factor * 2L
+  n.cumsum <- n.bins.zoom + 1L
+  while(bases.per.bin > 1){
+    left.chromStart <- peakStart - bases.per.bin
+    right.chromStart <- peakEnd-bases.per.bin
+    bases.per.bin <- as.integer(bases.per.bin / bin.factor)
+
+    right.cumsum.mat <- left.cumsum.mat <- matrix(NA, n.cumsum, n.samples)
+    right.limits <- bases.per.bin*(0:(n.cumsum-1))+right.chromStart
+    right.intervals <-
+      paste0(right.limits[-length(right.limits)], "-", right.limits[-1])
+    rownames(right.cumsum.mat) <- c("before", right.intervals)
+    left.limits <- bases.per.bin*(0:(n.cumsum-1))+left.chromStart
+    left.intervals <-
+      paste0(left.limits[-length(left.limits)], "-", left.limits[-1])
+    rownames(left.cumsum.mat) <- c("before", left.intervals)
+    for(sample.i in seq_along(two.list)){
+      one <- two.list[[sample.i]]
+      left.bins <- binSum(one, left.chromStart, bases.per.bin, n.bins.zoom)
+      right.bins <- binSum(one, right.chromStart, bases.per.bin, n.bins.zoom)
+      left.count <- c(left.cumsum.vec[sample.i], left.bins$count)
+      left.cumsum.mat[, sample.i] <- cumsum(left.count)
+      right.count <- c(right.cumsum.vec[sample.i], right.bins$count)
+      right.cumsum.mat[, sample.i] <- cumsum(right.count)
+    }
+  }
   four <- subset(chr11ChIPseq$coverage,
                  118120000 < chromStart &
                  chromEnd < 118126000) 

@@ -254,6 +254,9 @@ multiSampleSegHeuristic(
 	   peakStart,
 	   peakEnd);
     // one bin before and after estimated start/end:
+    printf("bases_per_bin=%d n_bins=%d left=%d right=%d\n",
+	   bases_per_bin_zoom, n_bins_zoom,
+	   left_chromStart, right_chromStart);
     for(sample_i=0; sample_i < n_samples; sample_i++){
       profile = samples[sample_i];
       status = binSum(profile->chromStart, profile->chromEnd,
