@@ -187,31 +187,60 @@ multiSampleSegHeuristic <- structure(function
              right.chromEnd < last.chromEnd)
     feasible.grid$model.i <- 1:nrow(feasible.grid)
     model.list <- list()
+    seg.list <- list()
     for(model.i in feasible.grid$model.i){
       model.row <- feasible.grid[model.i, ]
-      left.cumsum.row <- left.cumsum.mat[model.row$left.cumsum.row, ]
-      right.cumsum.row <- right.cumsum.mat[model.row$right.cumsum.row, ]
       
-      seg1.cumsums <- left.cumsum.row
-      seg1.chromEnd <- left.chromEnd.vec[model.row$left.cumsum.row-1]
+      seg1.cumsums <- left.cumsum.mat[model.row$left.cumsum.row-1, ]
+      seg1.chromEnd <- left.chromStart.vec[model.row$left.cumsum.row-1]
       seg1.bases <- seg1.chromEnd-max.chromStart
       seg1.means <- seg1.cumsums/seg1.bases
       seg1.loss <- OptimalPoissonLoss(seg1.cumsums, seg1.means)
+      seg.list[[paste(model.i, 1)]] <-
+        data.frame(chromStart=max.chromStart, chromEnd=seg1.chromEnd,
+                   mean=seg1.means, sample.id=names(two.list),
+                   model.i)
       
+      right.cumsum.row <- right.cumsum.mat[model.row$right.cumsum.row, ]
       seg2.cumsums <- right.cumsum.row-seg1.cumsums
       seg2.chromEnd <- right.chromEnd.vec[model.row$right.cumsum.row-1]
       seg2.bases <- seg2.chromEnd-seg1.chromEnd
       seg2.means <- seg2.cumsums/seg2.bases
       seg2.loss <- OptimalPoissonLoss(seg2.cumsums, seg2.means)
+      seg.list[[paste(model.i, 2)]] <-
+        data.frame(chromStart=seg1.chromEnd, chromEnd=seg2.chromEnd,
+                   mean=seg2.means, sample.id=names(two.list),
+                   model.i)
       
-      seg3.cumsums <- last.cumsum.vec-seg2.cumsums
+      seg3.cumsums <- last.cumsum.vec-right.cumsum.row
       seg3.bases <- last.chromEnd-seg2.chromEnd
-      seg3.means <- seg2.cumsums/seg3.bases
+      seg3.means <- seg3.cumsums/seg3.bases
       seg3.loss <- OptimalPoissonLoss(seg3.cumsums, seg3.means)
+      seg.list[[paste(model.i, 3)]] <-
+        data.frame(chromStart=seg2.chromEnd, chromEnd=last.chromEnd,
+                   mean=seg3.means, sample.id=names(two.list),
+                   model.i)
+
+      total.bases <- sum(seg1.bases + seg2.bases + seg3.bases)
+      stopifnot(all.equal(total.bases, last.chromEnd - max.chromStart))
 
       total.loss <- sum(seg1.loss + seg2.loss + seg3.loss)
       model.list[[model.i]] <- data.frame(model.row, total.loss)
     }
+    ## Plot the segment means as a reality check.
+    seg.df <- do.call(rbind, seg.list)
+    ggplot()+
+    geom_step(aes(chromStart/1e3, count),
+              data=data.frame(norm.df, what="data"),
+              color="grey")+
+    geom_segment(aes(chromStart/1e3, mean,
+                     xend=chromEnd/1e3, yend=mean),
+                 data=data.frame(seg.df, what="models"),
+                 size=4, color="green")+
+    theme_bw()+
+    theme(panel.margin=grid::unit(0, "cm"))+
+    facet_grid(sample.id ~ model.i, scales="free")
+
     model.df <- do.call(rbind, model.list)
     model.df$y <- -model.df$model.i * 0.1
     best.model <- model.df[which.min(model.df$total.loss), ]
@@ -225,7 +254,6 @@ multiSampleSegHeuristic <- structure(function
                  data=data.frame(bin.df, what="bins"),
                  color="black")+
     geom_segment(aes(peakStart/1e3, 0,
-                     color=what,
                      xend=peakEnd/1e3, yend=0),
                  data=data.frame(loss.best, what="peak"),
                  color="green")+
@@ -234,9 +262,14 @@ multiSampleSegHeuristic <- structure(function
                      xend=right.chromEnd/1e3, yend=y),
                  data=data.frame(model.df, what="models"),
                  size=4)+
+    geom_text(aes(left.chromStart/1e3, y,
+                  label="optimal "),
+              data=best.model,
+              hjust=1)+
     theme_bw()+
     theme(panel.margin=grid::unit(0, "cm"))+
-    facet_grid(sample.id ~ .)    
+    facet_grid(sample.id ~ .)
+
   }
   four <- subset(chr11ChIPseq$coverage,
                  118120000 < chromStart &
