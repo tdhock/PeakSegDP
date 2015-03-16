@@ -36,9 +36,9 @@ multiSampleSegHeuristic <- structure(function
                 sample.id %in% c("McGill0002", "McGill0004"))
   ## Find the best peak location across 2 samples.
 
-  ## optimal.seconds <- system.time({
-  ##   optimal <- multiSampleSegOptimal(two)
-  ## })[["elapsed"]]
+  optimal.seconds <- system.time({
+    optimal <- multiSampleSegOptimal(two)
+  })[["elapsed"]]
   optimal <- data.frame(chromStart=NA, chromEnd=NA)
   heuristic.seconds <- system.time({
     heuristic <- multiSampleSegHeuristic(two, 2)
@@ -64,7 +64,7 @@ multiSampleSegHeuristic <- structure(function
   max.chromStart <- max(sapply(two.list, with, chromStart[1]))
   min.chromEnd <- min(sapply(two.list, with, chromEnd[length(chromEnd)]))
   bases <- min.chromEnd-max.chromStart
-  bin.factor <- 2L
+  bin.factor <- 3L
   bases.per.bin <- 1L
   while(bases/bases.per.bin/bin.factor >= 4){
     bases.per.bin <- bases.per.bin * bin.factor
@@ -132,18 +132,21 @@ multiSampleSegHeuristic <- structure(function
     theme(panel.margin=grid::unit(0, "cm"))+
     facet_grid(sample.id ~ .)
 
-  peakStart <- loss.best$peakStart
-  peakEnd <- loss.best$peakEnd
+  ## These need to be computed once and then they never change.
   last.cumsum.vec <- cumsum.mat[nrow(cumsum.mat), ]
   last.chromEnd <- n.bins * bases.per.bin + max.chromStart
+  n.bins.zoom <- bin.factor * 2L
+  n.cumsum <- n.bins.zoom + 1L
+
+  ## These will change at the end of each iteration.
+  peakStart <- loss.best$peakStart
+  peakEnd <- loss.best$peakEnd
   left.cumsum.vec <- if(loss.best$seg1.last == 1){
     rep(0, n.samples)
   }else{
     cumsum.mat[loss.best$seg1.last-1, ]
   }
   right.cumsum.vec <- cumsum.mat[loss.best$seg2.last-1, ]
-  n.bins.zoom <- bin.factor * 2L
-  n.cumsum <- n.bins.zoom + 1L
   while(bases.per.bin > 1){
     left.chromStart <- peakStart - bases.per.bin
     right.chromStart <- peakEnd-bases.per.bin
@@ -241,6 +244,7 @@ multiSampleSegHeuristic <- structure(function
     theme(panel.margin=grid::unit(0, "cm"))+
     facet_grid(sample.id ~ model.i, scales="free")
 
+    ## Then plot the peaks only, colored by total cost of the model.
     model.df <- do.call(rbind, model.list)
     model.df$y <- -model.df$model.i * 0.1
     best.model <- model.df[which.min(model.df$total.loss), ]
@@ -270,6 +274,10 @@ multiSampleSegHeuristic <- structure(function
     theme(panel.margin=grid::unit(0, "cm"))+
     facet_grid(sample.id ~ .)
 
+    peakStart <- best.model$left.chromStart
+    peakEnd <- best.model$right.chromEnd
+    left.cumsum.vec <- left.cumsum.mat[best.model$left.cumsum.row-2, ]
+    right.cumsum.vec <- right.cumsum.mat[best.model$right.cumsum.row-1, ]
   }
   four <- subset(chr11ChIPseq$coverage,
                  118120000 < chromStart &
