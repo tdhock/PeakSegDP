@@ -98,12 +98,12 @@ multiSampleSegHeuristic <- structure(function
     seg1.loss <- OptimalPoissonLoss(seg1.cumsums, seg1.means)
     for(seg2.last in (seg1.last+1):(n.bins-1)){
       seg2.cumsums <- cumsum.mat[cbind(seg2.last, 1:n.samples)]-seg1.cumsums
-      seg2.bases <- seg2.last - seg1.last
-      seg2.means <- seg2.cumsums/seg2.bases/bases.per.bin
+      seg2.bases <- (seg2.last - seg1.last)*bases.per.bin
+      seg2.means <- seg2.cumsums/seg2.bases
       seg2.loss <- OptimalPoissonLoss(seg2.cumsums, seg2.means)
       seg3.cumsums <- cumsum.mat[cbind(n.bins, 1:n.samples)]-seg2.cumsums
-      seg3.bases <- n.bins-seg2.last
-      seg3.means <- seg3.cumsums/seg3.bases/bases.per.bin
+      seg3.bases <- (n.bins-seg2.last)*bases.per.bin
+      seg3.means <- seg3.cumsums/seg3.bases
       seg3.loss <- OptimalPoissonLoss(seg3.cumsums, seg3.means)
       total.loss <- seg1.loss + seg2.loss + seg3.loss
       loss.list[[paste(seg1.last, seg2.last)]] <-
@@ -131,8 +131,11 @@ multiSampleSegHeuristic <- structure(function
     theme_bw()+
     theme(panel.margin=grid::unit(0, "cm"))+
     facet_grid(sample.id ~ .)
+
   peakStart <- loss.best$peakStart
   peakEnd <- loss.best$peakEnd
+  last.cumsum.vec <- cumsum.mat[nrow(cumsum.mat), ]
+  last.chromEnd <- n.bins * bases.per.bin + max.chromStart
   left.cumsum.vec <- if(loss.best$seg1.last == 1){
     rep(0, n.samples)
   }else{
@@ -148,12 +151,16 @@ multiSampleSegHeuristic <- structure(function
 
     right.cumsum.mat <- left.cumsum.mat <- matrix(NA, n.cumsum, n.samples)
     right.limits <- bases.per.bin*(0:(n.cumsum-1))+right.chromStart
+    right.chromStart.vec <- right.limits[-length(right.limits)]
+    right.chromEnd.vec <- right.limits[-1]
     right.intervals <-
-      paste0(right.limits[-length(right.limits)], "-", right.limits[-1])
+      paste0(right.chromStart.vec, "-", right.chromEnd.vec)
     rownames(right.cumsum.mat) <- c("before", right.intervals)
     left.limits <- bases.per.bin*(0:(n.cumsum-1))+left.chromStart
+    left.chromStart.vec <- left.limits[-length(left.limits)]
+    left.chromEnd.vec <- left.limits[-1]
     left.intervals <-
-      paste0(left.limits[-length(left.limits)], "-", left.limits[-1])
+      paste0(left.chromStart.vec, "-", left.chromEnd.vec)
     rownames(left.cumsum.mat) <- c("before", left.intervals)
     for(sample.i in seq_along(two.list)){
       one <- two.list[[sample.i]]
@@ -164,6 +171,72 @@ multiSampleSegHeuristic <- structure(function
       right.count <- c(right.cumsum.vec[sample.i], right.bins$count)
       right.cumsum.mat[, sample.i] <- cumsum(right.count)
     }
+    possible.grid <- 
+    expand.grid(left.cumsum.row=3:n.cumsum, right.cumsum.row=2:n.cumsum)
+    possible.grid$left.chromStart <-
+      left.chromStart.vec[possible.grid$left.cumsum.row-1]
+    possible.grid$left.chromEnd <-
+      left.chromEnd.vec[possible.grid$left.cumsum.row-1]
+    possible.grid$right.chromStart <-
+      right.chromStart.vec[possible.grid$right.cumsum.row-1]
+    possible.grid$right.chromEnd <-
+      right.chromEnd.vec[possible.grid$right.cumsum.row-1]
+    feasible.grid <-
+      subset(possible.grid,
+             left.chromEnd <= right.chromStart &
+             right.chromEnd < last.chromEnd)
+    feasible.grid$model.i <- 1:nrow(feasible.grid)
+    model.list <- list()
+    for(model.i in feasible.grid$model.i){
+      model.row <- feasible.grid[model.i, ]
+      left.cumsum.row <- left.cumsum.mat[model.row$left.cumsum.row, ]
+      right.cumsum.row <- right.cumsum.mat[model.row$right.cumsum.row, ]
+      
+      seg1.cumsums <- left.cumsum.row
+      seg1.chromEnd <- left.chromEnd.vec[model.row$left.cumsum.row-1]
+      seg1.bases <- seg1.chromEnd-max.chromStart
+      seg1.means <- seg1.cumsums/seg1.bases
+      seg1.loss <- OptimalPoissonLoss(seg1.cumsums, seg1.means)
+      
+      seg2.cumsums <- right.cumsum.row-seg1.cumsums
+      seg2.chromEnd <- right.chromEnd.vec[model.row$right.cumsum.row-1]
+      seg2.bases <- seg2.chromEnd-seg1.chromEnd
+      seg2.means <- seg2.cumsums/seg2.bases
+      seg2.loss <- OptimalPoissonLoss(seg2.cumsums, seg2.means)
+      
+      seg3.cumsums <- last.cumsum.vec-seg2.cumsums
+      seg3.bases <- last.chromEnd-seg2.chromEnd
+      seg3.means <- seg2.cumsums/seg3.bases
+      seg3.loss <- OptimalPoissonLoss(seg3.cumsums, seg3.means)
+
+      total.loss <- sum(seg1.loss + seg2.loss + seg3.loss)
+      model.list[[model.i]] <- data.frame(model.row, total.loss)
+    }
+    model.df <- do.call(rbind, model.list)
+    model.df$y <- -model.df$model.i * 0.1
+    best.model <- model.df[which.min(model.df$total.loss), ]
+
+    ggplot()+
+    geom_step(aes(chromStart/1e3, count.norm),
+              data=data.frame(norm.df, what="data"),
+              color="grey")+
+    geom_segment(aes(chromStart/1e3, mean.norm,
+                     xend=chromEnd/1e3, yend=mean.norm),
+                 data=data.frame(bin.df, what="bins"),
+                 color="black")+
+    geom_segment(aes(peakStart/1e3, 0,
+                     color=what,
+                     xend=peakEnd/1e3, yend=0),
+                 data=data.frame(loss.best, what="peak"),
+                 color="green")+
+    geom_segment(aes(left.chromStart/1e3, y,
+                     color=total.loss,
+                     xend=right.chromEnd/1e3, yend=y),
+                 data=data.frame(model.df, what="models"),
+                 size=4)+
+    theme_bw()+
+    theme(panel.margin=grid::unit(0, "cm"))+
+    facet_grid(sample.id ~ .)    
   }
   four <- subset(chr11ChIPseq$coverage,
                  118120000 < chromStart &
