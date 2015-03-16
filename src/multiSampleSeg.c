@@ -346,7 +346,7 @@ multiSampleSegHeuristic(
 	}
       }//seg3_FirstIndex
     }//seg2_FirstIndex
-    printf("best first indices %d %d\n", best_seg2_FirstIndex, best_seg3_FirstIndex);
+    //printf("best first indices %d %d\n", best_seg2_FirstIndex, best_seg3_FirstIndex);
     for(sample_i=0; sample_i < n_samples; sample_i++){
       left_cumsum_vec[sample_i] = left_cumsum_mat[
 	n_cumsum_zoom*sample_i+best_seg2_FirstIndex-2];

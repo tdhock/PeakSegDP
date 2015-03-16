@@ -58,6 +58,79 @@ multiSampleSegHeuristic <- structure(function
     theme_bw()+
     theme(panel.margin=grid::unit(0, "cm"))+
     facet_grid(sample.id ~ ., scales="free")
+
+  ## Heuristic in R code for debugging.
+  two.list <- split(two, two$sample.id, drop=TRUE)
+  max.chromStart <- max(sapply(two.list, with, chromStart[1]))
+  min.chromEnd <- min(sapply(two.list, with, chromEnd[length(chromEnd)]))
+  bases <- min.chromEnd-max.chromStart
+  bin.factor <- 2L
+  bases.per.bin <- 1L
+  while(bases/bases.per.bin/bin.factor >= 4){
+    bases.per.bin <- bases.per.bin * bin.factor
+  }
+  n.bins <- as.integer(floor(bases/bases.per.bin))
+  n.samples <- length(two.list)
+  cumsum.mat <- bin.mat <- matrix(NA, n.bins, n.samples)
+  bin.list <- list()
+  norm.list <- list()
+  for(sample.i in seq_along(two.list)){
+    sample.id <- names(two.list)[sample.i]
+    one <- two.list[[sample.i]]
+    max.count <- max(one$count)
+    bins <- binSum(one, max.chromStart, bases.per.bin, n.bins)
+    bins$mean.norm <- bins$mean/max.count
+    bin.list[[sample.id]] <- data.frame(sample.id, rbind(bins, NA))
+    bin.mat[, sample.i] <- bins$count
+    cumsum.mat[, sample.i] <- cumsum(bins$count)
+    one$count.norm <- one$count/max.count
+    norm.list[[sample.i]] <- one
+  }
+  bin.df <- do.call(rbind, bin.list)
+  norm.df <- do.call(rbind, norm.list)
+  OptimalPoissonLoss <- function(cumsum.value, mean.value){
+    ifelse(cumsum.value == 0, 0, cumsum.value * (1-log(mean.value)))
+  }
+  loss.list <- list()
+  for(seg1.last in 1:(n.bins-2)){
+    seg1.cumsums <- cumsum.mat[seg1.last, ]
+    seg1.means <- seg1.cumsums/seg1.last/bases.per.bin
+    seg1.loss <- OptimalPoissonLoss(seg1.cumsums, seg1.means)
+    for(seg2.last in (seg1.last+1):(n.bins-1)){
+      seg2.cumsums <- cumsum.mat[cbind(seg2.last, 1:n.samples)]-seg1.cumsums
+      seg2.bases <- seg2.last - seg1.last
+      seg2.means <- seg2.cumsums/seg2.bases/bases.per.bin
+      seg2.loss <- OptimalPoissonLoss(seg2.cumsums, seg2.means)
+      seg3.cumsums <- cumsum.mat[cbind(n.bins, 1:n.samples)]-seg2.cumsums
+      seg3.bases <- n.bins-seg2.last
+      seg3.means <- seg3.cumsums/seg3.bases/bases.per.bin
+      seg3.loss <- OptimalPoissonLoss(seg3.cumsums, seg3.means)
+      total.loss <- seg1.loss + seg2.loss + seg3.loss
+      loss.list[[paste(seg1.last, seg2.last)]] <-
+        data.frame(seg1.last, seg2.last, total.loss,
+                   peakStart=seg1.last*bases.per.bin+max.chromStart,
+                   peakEnd=seg2.last*bases.per.bin+max.chromStart)
+    }
+  }
+  loss.df <- do.call(rbind, loss.list)
+  loss.best <- loss.df[which.min(loss.df$total.loss), ]
+  
+  ggplot()+
+    scale_size_manual(values=c(data=2, bins=1))+
+    scale_color_manual(values=c(data="grey50", bins="black", peak="green"))+
+    geom_step(aes(chromStart/1e3, count.norm, color=what),
+              data=data.frame(norm.df, what="data"))+
+    geom_segment(aes(chromStart/1e3, mean.norm,
+                     xend=chromEnd/1e3, yend=mean.norm,
+                     color=what),
+                 data=data.frame(bin.df, what="bins"))+
+    geom_segment(aes(peakStart/1e3, 0,
+                     color=what,
+                     xend=peakEnd/1e3, yend=0),
+                 data=data.frame(loss.best, what="peak"))+
+    theme_bw()+
+    theme(panel.margin=grid::unit(0, "cm"))+
+    facet_grid(sample.id ~ .)
   
   four <- subset(chr11ChIPseq$coverage,
                  118120000 < chromStart &
