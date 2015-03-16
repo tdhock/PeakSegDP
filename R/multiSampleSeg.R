@@ -57,6 +57,72 @@ multiSampleSegHeuristic <- structure(function
     theme(panel.margin=grid::unit(0, "cm"))+
     facet_grid(sample.id ~ ., scales="free")
 
+  ## Find the best peak location across 4 samples.
+  four <- subset(chr11ChIPseq$coverage,
+                 118120000 < chromStart &
+                 chromEnd < 118126000) 
+  optimal.seconds <- system.time({
+    optimal <- multiSampleSegOptimal(four)
+  })[["elapsed"]]
+  heuristic.seconds <- system.time({
+    heuristic <- multiSampleSegHeuristic(four, 2)
+  })[["elapsed"]]
+  rbind(heuristic.seconds, optimal.seconds)
+  peaks <-
+    rbind(data.frame(optimal, model="optimal"),
+          data.frame(heuristic, model="heuristic"))
+  ggplot()+
+    geom_step(aes(chromStart/1e3, count), data=four)+
+    scale_size_manual(values=c(optimal=2, heuristic=1))+
+    geom_segment(aes(chromStart/1e3, 0,
+                     color=model, size=model,
+                     xend=chromEnd/1e3, yend=0),
+                 data=peaks)+
+    theme_bw()+
+    theme(panel.margin=grid::unit(0, "cm"))+
+    facet_grid(sample.id ~ ., scales="free")
+
+  ## TODO: plot microbenchmark time versus parameter.
+
+  ## A fake data set with two profiles with very different scales for
+  ## the count variable, showing that the profile with the small
+  ## counts will be basically ignored when computing the optimal
+  ## peak.
+  count <-
+    c(rep(c(0, 1), each=100),
+      rep(c(10, 11), each=200),
+      rep(c(0, 1), each=100))
+  chromEnd <- seq_along(count)
+  chromStart <- chromEnd-1L
+  offset <- 50L
+  multi.scale <- 
+  rbind(data.frame(sample.id="low", chromStart, chromEnd,
+                   count=as.integer(count)),
+        data.frame(sample.id="hi",
+                   chromStart=chromStart+offset,
+                   chromEnd=chromEnd+offset,
+                   count=as.integer(count*1000)))
+  heuristic.seconds <- system.time({
+    heuristic <- multiSampleSegHeuristic(multi.scale, 2)
+  })[["elapsed"]]
+  optimal.seconds <- system.time({
+    optimal <- multiSampleSegOptimal(multi.scale)
+  })[["elapsed"]]
+  rbind(heuristic.seconds, optimal.seconds)
+  peaks <-
+    rbind(data.frame(optimal, model="optimal"),
+          data.frame(heuristic, model="heuristic"))
+  ggplot()+
+    geom_step(aes(chromStart, count), data=multi.scale)+
+    scale_size_manual(values=c(optimal=2, heuristic=1))+
+    geom_segment(aes(chromStart, 0,
+                     color=model, size=model,
+                     xend=chromEnd, yend=0),
+                 data=peaks)+
+    theme_bw()+
+    theme(panel.margin=grid::unit(0, "cm"))+
+    facet_grid(sample.id ~ ., scales="free")
+  
   ## Heuristic in R code for debugging.
   two.list <- split(two, two$sample.id, drop=TRUE)
   max.chromStart <- max(sapply(two.list, with, chromStart[1]))
@@ -277,71 +343,6 @@ multiSampleSegHeuristic <- structure(function
     left.cumsum.vec <- left.cumsum.mat[best.model$left.cumsum.row-2, ]
     right.cumsum.vec <- right.cumsum.mat[best.model$right.cumsum.row-1, ]
   }
-
-  ## Find the best peak location across 4 samples.
-  four <- subset(chr11ChIPseq$coverage,
-                 118120000 < chromStart &
-                 chromEnd < 118126000) 
-  optimal.seconds <- system.time({
-    optimal <- multiSampleSegOptimal(four)
-  })[["elapsed"]]
-  heuristic.seconds <- system.time({
-    heuristic <- multiSampleSegHeuristic(four, 2)
-  })[["elapsed"]]
-  rbind(heuristic.seconds, optimal.seconds)
-  peaks <-
-    rbind(data.frame(optimal, model="optimal"),
-          data.frame(heuristic, model="heuristic"))
-  ggplot()+
-    geom_step(aes(chromStart/1e3, count), data=four)+
-    scale_size_manual(values=c(optimal=2, heuristic=1))+
-    geom_segment(aes(chromStart/1e3, 0,
-                     color=model, size=model,
-                     xend=chromEnd/1e3, yend=0),
-                 data=peaks)+
-    theme_bw()+
-    theme(panel.margin=grid::unit(0, "cm"))+
-    facet_grid(sample.id ~ ., scales="free")
-
-  ## A fake data set with two profiles with very different scales for
-  ## the count variable, showing that the profile with the small
-  ## counts will be basically ignored when computing the optimal
-  ## peak.
-  count <-
-    c(rep(c(0, 1), each=100),
-      rep(c(10, 11), each=200),
-      rep(c(0, 1), each=100))
-  chromEnd <- seq_along(count)
-  chromStart <- chromEnd-1L
-  offset <- 50L
-  multi.scale <- 
-  rbind(data.frame(sample.id="low", chromStart, chromEnd,
-                   count=as.integer(count)),
-        data.frame(sample.id="hi",
-                   chromStart=chromStart+offset,
-                   chromEnd=chromEnd+offset,
-                   count=as.integer(count*1000)))
-  heuristic.seconds <- system.time({
-    heuristic <- multiSampleSegHeuristic(multi.scale, 2)
-  })[["elapsed"]]
-  optimal.seconds <- system.time({
-    optimal <- multiSampleSegOptimal(multi.scale)
-  })[["elapsed"]]
-  rbind(heuristic.seconds, optimal.seconds)
-  peaks <-
-    rbind(data.frame(optimal, model="optimal"),
-          data.frame(heuristic, model="heuristic"))
-  ggplot()+
-    geom_step(aes(chromStart, count), data=multi.scale)+
-    scale_size_manual(values=c(optimal=2, heuristic=1))+
-    geom_segment(aes(chromStart, 0,
-                     color=model, size=model,
-                     xend=chromEnd, yend=0),
-                 data=peaks)+
-    theme_bw()+
-    theme(panel.margin=grid::unit(0, "cm"))+
-    facet_grid(sample.id ~ ., scales="free")
-  
 
 })
 
