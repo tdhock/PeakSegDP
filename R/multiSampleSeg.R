@@ -29,6 +29,7 @@ multiSampleSegHeuristic <- structure(function
              chromEnd=chromStartEnd[2])
 }, ex=function(){
   library(PeakSegDP)
+
   data(chr11ChIPseq)
   two <- subset(chr11ChIPseq$coverage,
                 118090000 < chromStart &
@@ -82,22 +83,6 @@ multiSampleSegHeuristic <- structure(function
     theme(panel.margin=grid::unit(0, "cm"))+
     facet_grid(sample.id ~ ., scales="free")
 
-  ## plot microbenchmark time versus parameter.
-  library(microbenchmark)
-  m.args <- list()
-  results <- list()
-  for(param in paste(c(2, 3, 5, 10, 15, 20, 25, 30, 100, 1000))){
-    m.args[[param]] <- x <- quote({
-      results[[param]] <- multiSampleSegHeuristic(four, 2)
-    })
-    eval(x)
-  }
-  times <- microbenchmark(list=m.args)
-  ggplot()+
-    scale_x_log10()+
-    geom_point(aes(as.numeric(as.character(expr)), time/1e9),
-               data=times, pch=1)
-
   ## A fake data set with two profiles with very different scales for
   ## the count variable, showing that the profile with the small
   ## counts will be basically ignored when computing the optimal
@@ -137,10 +122,62 @@ multiSampleSegHeuristic <- structure(function
     theme(panel.margin=grid::unit(0, "cm"))+
     facet_grid(sample.id ~ ., scales="free")
   
+  ## plot microbenchmark time versus parameter.
+  data(H3K4me3.TDH.immune.chunk12.cluster4)
+  many <- H3K4me3.TDH.immune.chunk12.cluster4
+  optimal.seconds <- system.time({
+    optimal <- multiSampleSegOptimal(many)
+  })[["elapsed"]]
+  library(microbenchmark)
+  m.args <- list()
+  results <- list()
+  param.values <-
+    c(2, 3, 5, 10, 15, 20, 25, 30, 50, 75, 100, 125, 150,
+      200, 300, 400, 500, 600)
+  for(param in param.values){
+    param.name <- paste(param)
+    param.int <- as.integer(param)
+    m.args[[param.name]] <- substitute({
+      peak <- multiSampleSegHeuristic(many, PINT)
+      diff.bases <- sum(abs(peak - optimal))
+      results[[paste(PINT)]] <- data.frame(param=PINT, peak, diff.bases)
+    }, list(PINT=param.int))
+  }
+  times <- microbenchmark(list=m.args, times=3)
+  (results.df <- do.call(rbind, results))
+  ggplot()+
+    scale_x_log10()+
+    scale_y_log10()+
+    geom_point(aes(as.numeric(as.character(param)), diff.bases),
+               data=data.frame(results.df, what="diff.bases"),
+               pch=1)+
+    facet_grid(what ~ ., scales="free")+
+    geom_point(aes(as.numeric(as.character(expr)), time/1e9),
+               data=data.frame(times, what="seconds"), pch=1)
+
+  heuristic <- subset(results.df, param=="2", select=c(chromStart, chromEnd))
+  peaks <-
+    rbind(data.frame(optimal, model="optimal"),
+          data.frame(heuristic, model="heuristic"))
+  ggplot()+
+    geom_step(aes(chromStart/1e3, count), data=many)+
+    scale_size_manual(values=c(optimal=2, heuristic=1))+
+    geom_segment(aes(chromStart/1e3, 0,
+                     color=model, size=model,
+                     xend=chromEnd/1e3, yend=0),
+                 data=peaks)+
+    theme_bw()+
+    theme(panel.margin=grid::unit(0, "cm"))+
+    facet_grid(sample.id ~ ., scales="free")
+
   ## Heuristic in R code for debugging.
-  two.list <- split(two, two$sample.id, drop=TRUE)
+  heuristic.seconds <- system.time({
+    heuristic <- multiSampleSegHeuristic(many, 2)
+  })[["elapsed"]]
+  two.list <- split(many, many$sample.id, drop=TRUE)
   max.chromStart <- max(sapply(two.list, with, chromStart[1]))
   min.chromEnd <- min(sapply(two.list, with, chromEnd[length(chromEnd)]))
+  c(max.chromStart, min.chromEnd)
   bases <- min.chromEnd-max.chromStart
   bin.factor <- 2L
   bases.per.bin <- 1L
@@ -173,19 +210,24 @@ multiSampleSegHeuristic <- structure(function
   for(seg1.last in 1:(n.bins-2)){
     seg1.cumsums <- cumsum.mat[seg1.last, ]
     seg1.means <- seg1.cumsums/seg1.last/bases.per.bin
-    seg1.loss <- OptimalPoissonLoss(seg1.cumsums, seg1.means)
+    seg1.loss.vec <- OptimalPoissonLoss(seg1.cumsums, seg1.means)
+    seg1.loss <- sum(seg1.loss.vec)
     for(seg2.last in (seg1.last+1):(n.bins-1)){
-      seg2.cumsums <- cumsum.mat[cbind(seg2.last, 1:n.samples)]-seg1.cumsums
+      cumsum.seg2.end <- cumsum.mat[cbind(seg2.last, 1:n.samples)]
+      seg2.cumsums <- cumsum.seg2.end-seg1.cumsums
       seg2.bases <- (seg2.last - seg1.last)*bases.per.bin
       seg2.means <- seg2.cumsums/seg2.bases
-      seg2.loss <- OptimalPoissonLoss(seg2.cumsums, seg2.means)
-      seg3.cumsums <- cumsum.mat[cbind(n.bins, 1:n.samples)]-seg2.cumsums
+      seg2.loss.vec <- OptimalPoissonLoss(seg2.cumsums, seg2.means)
+      seg2.loss <- sum(seg2.loss.vec)
+      seg3.cumsums <- cumsum.mat[cbind(n.bins, 1:n.samples)]-cumsum.seg2.end
       seg3.bases <- (n.bins-seg2.last)*bases.per.bin
       seg3.means <- seg3.cumsums/seg3.bases
-      seg3.loss <- OptimalPoissonLoss(seg3.cumsums, seg3.means)
+      seg3.loss.vec <- OptimalPoissonLoss(seg3.cumsums, seg3.means)
+      seg3.loss <- sum(seg3.loss.vec)
       total.loss <- seg1.loss + seg2.loss + seg3.loss
       loss.list[[paste(seg1.last, seg2.last)]] <-
         data.frame(seg1.last, seg2.last, total.loss,
+                   seg1.loss, seg2.loss, seg3.loss,
                    peakStart=seg1.last*bases.per.bin+max.chromStart,
                    peakEnd=seg2.last*bases.per.bin+max.chromStart)
     }
@@ -225,6 +267,8 @@ multiSampleSegHeuristic <- structure(function
     cumsum.mat[loss.best$seg1.last-1, ]
   }
   right.cumsum.vec <- cumsum.mat[loss.best$seg2.last-1, ]
+  search.list <- list()
+  best.list <- list()
   while(bases.per.bin > 1){
     left.chromStart <- peakStart - bases.per.bin
     right.chromStart <- peakEnd-bases.per.bin
@@ -317,17 +361,19 @@ multiSampleSegHeuristic <- structure(function
     geom_segment(aes(chromStart/1e3, mean,
                      xend=chromEnd/1e3, yend=mean),
                  data=data.frame(seg.df, what="models"),
-                 size=4, color="green")+
+                 size=1, color="green")+
     theme_bw()+
     theme(panel.margin=grid::unit(0, "cm"))+
     facet_grid(sample.id ~ model.i, scales="free")
 
     ## Then plot the peaks only, colored by total cost of the model.
     model.df <- do.call(rbind, model.list)
-    model.df$y <- -model.df$model.i * 0.1
+    model.df$y <- with(model.df, model.i/max(model.i))
     best.model <- model.df[which.min(model.df$total.loss), ]
 
     ggplot()+
+      xlab("position on chromosome (kilobases = kb)")+
+      scale_y_continuous("", breaks=NULL)+
     geom_step(aes(chromStart/1e3, count.norm),
               data=data.frame(norm.df, what="data"),
               color="grey")+
@@ -342,22 +388,71 @@ multiSampleSegHeuristic <- structure(function
     geom_segment(aes(left.chromStart/1e3, y,
                      color=total.loss,
                      xend=right.chromEnd/1e3, yend=y),
-                 data=data.frame(model.df, what="models"),
-                 size=4)+
+                 data=data.frame(model.df, sample.id="peaks"),
+                 size=1)+
     geom_text(aes(left.chromStart/1e3, y,
                   label="optimal "),
-              data=best.model,
+              data=data.frame(best.model, sample.id="peaks"),
               hjust=1)+
     theme_bw()+
     theme(panel.margin=grid::unit(0, "cm"))+
     facet_grid(sample.id ~ .)
+
+    search.list[[paste(bases.per.bin)]] <-
+      data.frame(bases.per.bin, model.df)
+    best.list[[paste(bases.per.bin)]] <-
+      data.frame(bases.per.bin, best.model)
 
     peakStart <- best.model$left.chromStart
     peakEnd <- best.model$right.chromEnd
     left.cumsum.vec <- left.cumsum.mat[best.model$left.cumsum.row-2, ]
     right.cumsum.vec <- right.cumsum.mat[best.model$right.cumsum.row-1, ]
   }
-
+  samplefac <- function(L){
+    df <- do.call(rbind, L)
+    sample.ids <- unique(norm.df$sample.id)
+    bases.num <- sort(unique(df$bases.per.bin), decreasing=TRUE)
+    levs <- c(paste(sample.ids), paste(bases.num))
+    df$sample.id <- factor(df$bases.per.bin, levs)
+    df
+  }
+  search.df <- samplefac(search.list)
+  best.df <- samplefac(best.list)
+  searchPlot <- 
+    ggplot()+
+      xlab("position on chromosome (kilobases = kb)")+
+      scale_y_continuous("", breaks=NULL)+
+    geom_step(aes(chromStart/1e3, count.norm),
+              data=data.frame(norm.df, what="data"),
+              color="grey")+
+    geom_segment(aes(chromStart/1e3, mean.norm,
+                     xend=chromEnd/1e3, yend=mean.norm),
+                 data=data.frame(bin.df, what="bins"),
+                 color="black")+
+    geom_vline(aes(xintercept=chromStart/1e3),
+               data=optimal,
+               color="green")+
+    geom_vline(aes(xintercept=chromEnd/1e3),
+               data=optimal,
+               color="green")+
+    geom_segment(aes(left.chromStart/1e3, y,
+                     color=total.loss,
+                     xend=right.chromEnd/1e3, yend=y),
+                 data=search.df,
+                 size=1)+
+    geom_text(aes(left.chromStart/1e3, y,
+                  label="selected"),
+              data=best.df,
+              hjust=1)+
+    theme_bw()+
+    theme(panel.margin=grid::unit(0, "cm"))+
+    facet_grid(sample.id ~ ., labeller=function(var, val){
+      sub("McGill0", "", val)
+    })
+  png("figure-multiSampleSegHeuristic.png",
+      units="in", res=200, width=8, height=20)
+  print(searchPlot)
+  dev.off()
 })
 
 multiSampleSegOptimal <- function

@@ -40,31 +40,44 @@ void get_best_FirstIndex(
   int n_samples,
   int first_possible_index,
   int last_possible_index,
+  int bases_per_bin,
   int *best_FirstIndex, //output
   double *best_loss //output
   ){
   int sample_i;
-  int* cumsum_vec;
+  int* cumsum_vec, cumsum_value, cumsum_prev_end, cumsum_this_end;
   int LastSeg_FirstIndex;
-  double candidate_loss, cumsum_value, mean_value;
+  double candidate_loss, mean_value, bases_value,
+    prev_loss, this_loss, loss_value;
   *best_loss = INFINITY;
   for(LastSeg_FirstIndex = first_possible_index; 
       LastSeg_FirstIndex <= last_possible_index;
       LastSeg_FirstIndex++){
     // start with previous segment optimal loss.
-    candidate_loss = PrevSegs_loss_vec[LastSeg_FirstIndex-1];
+    this_loss = 0.0;
     for(sample_i=0; sample_i < n_samples; sample_i++){
       cumsum_vec = sample_cumsum_mat + n_data * sample_i;
       /*  
 	  the optimal loss of segment (t', t]
 	  can be computed in O(1) time given the vector of cumsums.
       */
-      cumsum_value = cumsum_vec[last_possible_index] - 
-	cumsum_vec[LastSeg_FirstIndex-1];
-      mean_value = ((double)cumsum_value)/
-	((double)last_possible_index-LastSeg_FirstIndex+1);
-      candidate_loss += OptimalPoissonLoss(cumsum_value, mean_value);
+      cumsum_prev_end = cumsum_vec[LastSeg_FirstIndex-1];
+      cumsum_this_end = cumsum_vec[last_possible_index];
+      cumsum_value = cumsum_this_end - cumsum_prev_end;
+      bases_value = bases_per_bin*(last_possible_index-LastSeg_FirstIndex+1);
+      mean_value = ((double)cumsum_value)/bases_value;
+      loss_value = OptimalPoissonLoss(cumsum_value, mean_value);
+      /* printf("%dsample%d prev=%d this=%d bases=%f mean=%f loss=%f\n",  */
+      /* 	     LastSeg_FirstIndex, sample_i, */
+      /* 	     //cumsum_value,  */
+      /* 	     cumsum_prev_end, cumsum_this_end, */
+      /* 	     bases_value, mean_value, loss_value); */
+      this_loss += loss_value;
     }
+    prev_loss = PrevSegs_loss_vec[LastSeg_FirstIndex-1];
+    /* printf("%d prev=%f this=%f\n", LastSeg_FirstIndex,  */
+    /* 	   prev_loss, this_loss); */
+    candidate_loss = prev_loss + this_loss;
     if(candidate_loss < *best_loss){
       //printf("LastSeg_FirstIndex=%d\n", LastSeg_FirstIndex);
       *best_loss = candidate_loss;
@@ -107,7 +120,10 @@ multiSampleSegHeuristic(
     //profile->chromStart[0];
     //}
   }
+  /* printf("max_chromStart=%d min_chromEnd=%d\n", */
+  /* 	 max_chromStart, min_chromEnd); */
   int bases = min_chromEnd - max_chromStart;
+  double bases_value, seg1_loss_value;
   if(bases/bin_factor < 4){
     /*
       4 is smallest the number of data points for which the 3-segment
@@ -149,10 +165,13 @@ multiSampleSegHeuristic(
     offset = n_bins * sample_i;
     count_vec = sample_count_mat + offset;
     cumsum_vec = sample_cumsum_mat + offset;
+    //printf("[sample%02d] ", sample_i);
     for(bin_i=0; bin_i < n_bins; bin_i++){
       cumsum_value += count_vec[bin_i];
+      //printf("%d ", cumsum_value);
       cumsum_vec[bin_i] = cumsum_value;
     }
+    //printf("\n");
   }
   /*
     First step of DPA: compute optimal loss for 1 segment up to data
@@ -167,10 +186,12 @@ multiSampleSegHeuristic(
       printf("bin=%d sample=%d cumsum=%d\n", 
 	     bin_i, sample_i, cumsum_value);
       */
-      mean_value = ((double) cumsum_value) / ((double)bin_i+1);
+      bases_value = (bin_i+1) * bases_per_bin;
+      mean_value = ((double) cumsum_value) / bases_value;
       loss_value = OptimalPoissonLoss(cumsum_value, mean_value);
       seg1_loss_vec[bin_i] += loss_value;
     }
+    //printf("seg1_loss[%d]=%f\n", bin_i, seg1_loss_vec[bin_i]);
   }
   /* 
      Second step of DPA: compute optimal loss in 2 segments up to data
@@ -181,8 +202,9 @@ multiSampleSegHeuristic(
   int seg2_FirstIndex, seg2_LastIndex, best_FirstIndex;
   double seg1_loss, min_loss, seg2_loss, candidate_loss, seg3_loss;
   for(seg2_LastIndex=1; 
-      seg2_LastIndex < n_bins; 
+      seg2_LastIndex <= n_bins-2; 
       seg2_LastIndex++){
+    //printf("seg2_LastIndex=%d\n", seg2_LastIndex);
     get_best_FirstIndex(
       seg1_loss_vec,
       n_bins,
@@ -190,6 +212,7 @@ multiSampleSegHeuristic(
       n_samples,
       1, // first_possible_index
       seg2_LastIndex, // last_possible_index
+      bases_per_bin,
       seg2_first_vec + seg2_LastIndex,
       seg12_loss_vec + seg2_LastIndex);
   }
@@ -209,17 +232,20 @@ multiSampleSegHeuristic(
     n_samples,
     2, // first_possible_index
     n_bins-1, // last_possible_index
+    bases_per_bin,
     &seg3_FirstIndex,
     &best_loss);
   seg2_LastIndex = seg3_FirstIndex-1;
   seg2_FirstIndex = seg2_first_vec[seg2_LastIndex];
   int seg1_LastIndex = seg2_FirstIndex-1;
-  /* printf("[0,%d] [%d,%d] [%d,%d]\n", */
-  /* 	 seg1_LastIndex, */
-  /* 	 seg2_FirstIndex, seg2_LastIndex, */
-  /* 	 seg3_FirstIndex, n_bins-1); */
   int peakStart = max_chromStart + bases_per_bin * seg2_FirstIndex;
   int peakEnd = max_chromStart + bases_per_bin * seg3_FirstIndex;
+  /* printf("[0,%d] %d[%d,%d]%d [%d,%d]\n", */
+  /* 	 seg1_LastIndex, */
+  /* 	 peakStart, */
+  /* 	 seg2_FirstIndex, seg2_LastIndex, */
+  /* 	 peakEnd, */
+  /* 	 seg3_FirstIndex, n_bins-1); */
 
   int n_bins_zoom = bin_factor * 2; 
   int n_cumsum_zoom = n_bins_zoom + 1;
@@ -252,7 +278,7 @@ multiSampleSegHeuristic(
     int right_chromStart = peakEnd - bases_per_bin_zoom;
     // Important to determine chromStart before!
     bases_per_bin_zoom /= bin_factor;
-    /* printf("bases/bin (zoom)=%d [%d,%d]\n",  */
+    /* printf("bases/bin (zoom)=%d [%d,%d]\n", */
     /* 	   bases_per_bin_zoom, */
     /* 	   peakStart, */
     /* 	   peakEnd); */
@@ -307,7 +333,6 @@ multiSampleSegHeuristic(
     /*   printf("\n"); */
     /* } */
   
-    double bases_value, seg1_loss_value;
     int best_seg2_FirstIndex, best_seg3_FirstIndex, 
       seg2_chromEnd, seg1_chromEnd, after_cumsum,
       last_bin_cumsum, cumsum_seg2_end;
@@ -375,7 +400,7 @@ multiSampleSegHeuristic(
 	    seg3_loss += loss_value;
 	  }
 	  candidate_loss = seg1_loss + seg2_loss + seg3_loss;
-	  /* printf("loss %d %d loss=%f\n",  */
+	  /* printf("loss %d %d loss=%f\n", */
 	  /* 	 seg2_FirstIndex, seg3_FirstIndex, */
 	  /* 	 candidate_loss); */
 	  if(candidate_loss < min_loss){
@@ -386,7 +411,7 @@ multiSampleSegHeuristic(
 	}
       }//seg3_FirstIndex
     }//seg2_FirstIndex
-    /* printf("best %d %d loss=%f final\n",  */
+    /* printf("best %d %d loss=%f final\n", */
     /* 	   best_seg2_FirstIndex, best_seg3_FirstIndex, */
     /* 	   min_loss); */
     for(sample_i=0; sample_i < n_samples; sample_i++){
