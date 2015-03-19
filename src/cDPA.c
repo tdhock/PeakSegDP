@@ -94,7 +94,15 @@ void cDPA
     SommeWei= weights[i];
 
     if(SommeSeq != 0){
-      // chech what it does when Somme = 0
+      // The formula for the optimal Poisson loss 
+      // for 1 segment with d integer 
+      // data points x_j and weights w_j is
+      // \sum_{j=1}^d w_j m_j - w_j x_j \log m_j =
+      //   ( \sum_{j=1}^d w_j x_j ) (1-\log \hat m)
+      // where the segment mean \hat m = (\sum w_j x_j)/(\sum w_j),
+      // and the only term that depends on the mean is
+      // (\sum_{j=1}^d w_j x_j)(-\log\hat m),
+      // which is what is coded below.
       CostSegitoj = - SommeSeq * (log(SommeSeq) - log(SommeWei)); 
     } else {
       CostSegitoj = 0;

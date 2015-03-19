@@ -184,9 +184,12 @@ multiSampleSegHeuristic <- structure(function
   while(bases/bases.per.bin/bin.factor >= 4){
     bases.per.bin <- bases.per.bin * bin.factor
   }
-  n.bins <- as.integer(floor(bases/bases.per.bin))
+  n.bins <- as.integer(bases %/% bases.per.bin + 1L)
   n.samples <- length(two.list)
-  cumsum.mat <- bin.mat <- matrix(NA, n.bins, n.samples)
+  cumsum.mat <- bin.mat <-
+    weighted.count.mat <- 
+      matrix(NA, n.bins, n.samples,
+             dimnames=list(bin=NULL, sample.id=names(two.list)))
   bin.list <- list()
   norm.list <- list()
   for(sample.i in seq_along(two.list)){
@@ -194,35 +197,74 @@ multiSampleSegHeuristic <- structure(function
     one <- two.list[[sample.i]]
     max.count <- max(one$count)
     bins <- binSum(one, max.chromStart, bases.per.bin, n.bins)
+    stopifnot(identical(min.chromEnd < bins$chromEnd,
+                        c(rep(FALSE, nrow(bins)-1), TRUE)))
+    bins[nrow(bins), "chromEnd"] <- min.chromEnd
     bins$mean.norm <- bins$mean/max.count
     bin.list[[sample.id]] <- data.frame(sample.id, rbind(bins, NA))
     bin.mat[, sample.i] <- bins$count
+    bases.vec <- with(bins, chromEnd-chromStart)
+    weight.vec <- bases.vec/bases
+    weighted.counts <- bins$count * weight.vec
     cumsum.mat[, sample.i] <- cumsum(bins$count)
+    weighted.count.mat[, sample.i] <- cumsum(weighted.counts)
     one$count.norm <- one$count/max.count
     norm.list[[sample.i]] <- one
   }
+  weighted.bases <- bases.vec * weight.vec
+  weighted.bases.vec <- cumsum(weighted.bases)
   bin.df <- do.call(rbind, bin.list)
   norm.df <- do.call(rbind, norm.list)
-  OptimalPoissonLoss <- function(cumsum.value, mean.value){
-    ifelse(cumsum.value == 0, 0, cumsum.value * (1-log(mean.value)))
+  ## Say we have a segment with n bins, each size b_j with total x_j
+  ## reads. the overall base-pair level segment mean is: \mu =
+  ## (\sum_j x_j)/(\sum_j b_j) and the bin-level mean is m_j = \mu b_j.
+  ## Each bin has weight w_j = b_j /(\sum_j b_j), and the loss is
+  ## \mu(\sum_j w_j b_j)-(\sum_j w_j x_j)\log\mu
+  ## (excluding constant terms independent of \mu).
+  OptimalPoissonLoss <- function(base.mean, weighted.bases, weighted.count){
+    pos.term <- base.mean * weighted.bases
+    neg.term <- weighted.count * log(base.mean)
+    ifelse(base.mean == 0, 0, pos.term - neg.term)
   }
   loss.list <- list()
+  seg.list <- list()
   for(seg1.last in 1:(n.bins-2)){
     seg1.cumsums <- cumsum.mat[seg1.last, ]
-    seg1.means <- seg1.cumsums/seg1.last/bases.per.bin
-    seg1.loss.vec <- OptimalPoissonLoss(seg1.cumsums, seg1.means)
+    seg1.weighted.counts <- weighted.count.mat[seg1.last, ]
+    seg1.bases <- seg1.last*bases.per.bin
+    seg1.chromEnd <- seg1.bases + max.chromStart
+    seg1.means <- seg1.cumsums/seg1.bases
+    seg1.weighted.bases <- weighted.bases.vec[seg1.last]
+    seg1.loss.vec <-
+      OptimalPoissonLoss(seg1.means, seg1.weighted.bases, seg1.weighted.counts)
     seg1.loss <- sum(seg1.loss.vec)
     for(seg2.last in (seg1.last+1):(n.bins-1)){
-      cumsum.seg2.end <- cumsum.mat[cbind(seg2.last, 1:n.samples)]
+      cumsum.seg2.end <- cumsum.mat[seg2.last, ]
       seg2.cumsums <- cumsum.seg2.end-seg1.cumsums
-      seg2.bases <- (seg2.last - seg1.last)*bases.per.bin
+      weighted.counts.seg2.end <- weighted.count.mat[seg2.last, ]
+      seg2.weighted.counts <- weighted.counts.seg2.end - seg1.weighted.counts
+      seg12.bases <- seg2.last*bases.per.bin
+      seg2.bases <- seg12.bases - seg1.bases
+      seg2.chromEnd <- seg1.chromEnd + seg2.bases
       seg2.means <- seg2.cumsums/seg2.bases
-      seg2.loss.vec <- OptimalPoissonLoss(seg2.cumsums, seg2.means)
+      weighted.bases.seg2.end <- weighted.bases.vec[seg2.last]
+      seg2.weighted.bases <- weighted.bases.seg2.end-seg1.weighted.bases
+      seg2.loss.vec <-
+        OptimalPoissonLoss(seg2.means,
+                           seg2.weighted.bases,
+                           seg2.weighted.counts)
       seg2.loss <- sum(seg2.loss.vec)
-      seg3.cumsums <- cumsum.mat[cbind(n.bins, 1:n.samples)]-cumsum.seg2.end
-      seg3.bases <- (n.bins-seg2.last)*bases.per.bin
+      
+      seg3.cumsums <- cumsum.mat[n.bins, ]-cumsum.seg2.end
+      seg3.weighted.counts <-
+        weighted.count.mat[n.bins, ]-weighted.counts.seg2.end
+      seg3.bases <- bases - seg12.bases
       seg3.means <- seg3.cumsums/seg3.bases
-      seg3.loss.vec <- OptimalPoissonLoss(seg3.cumsums, seg3.means)
+      seg3.weighted.bases <- weighted.bases.vec[n.bins]-weighted.bases.seg2.end
+      seg3.loss.vec <-
+        OptimalPoissonLoss(seg3.means,
+                           seg3.weighted.bases,
+                           seg3.weighted.counts)
       seg3.loss <- sum(seg3.loss.vec)
       total.loss <- seg1.loss + seg2.loss + seg3.loss
       loss.list[[paste(seg1.last, seg2.last)]] <-
@@ -230,27 +272,39 @@ multiSampleSegHeuristic <- structure(function
                    seg1.loss, seg2.loss, seg3.loss,
                    peakStart=seg1.last*bases.per.bin+max.chromStart,
                    peakEnd=seg2.last*bases.per.bin+max.chromStart)
+      mean.mat <- rbind(seg1.means, seg2.means, seg3.means)
+      for(sample.id in colnames(mean.mat)){
+        seg.list[[paste(seg1.last, seg2.last)]][[sample.id]] <-
+          data.frame(sample.id,
+                     chromStart=c(max.chromStart, seg1.chromEnd, seg2.chromEnd),
+                     chromEnd=c(seg1.chromEnd, seg2.chromEnd, min.chromEnd),
+                     mean=mean.mat[, sample.id])
+      }
     }
   }
   loss.df <- do.call(rbind, loss.list)
   loss.best <- loss.df[which.min(loss.df$total.loss), ]
+  seg.df <- do.call(rbind, {
+    seg.list[[with(loss.best, paste(seg1.last, seg2.last))]]
+  })
   
   ggplot()+
-    scale_size_manual(values=c(data=2, bins=1))+
-    scale_color_manual(values=c(data="grey50", bins="black", peak="green"))+
-    geom_step(aes(chromStart/1e3, count.norm, color=what),
+    scale_color_manual(values=c(data="grey50", bins="black", segments="green"))+
+    geom_step(aes(chromStart/1e3, count, color=what),
               data=data.frame(norm.df, what="data"))+
-    geom_segment(aes(chromStart/1e3, mean.norm,
-                     xend=chromEnd/1e3, yend=mean.norm,
+    geom_segment(aes(chromStart/1e3, mean,
+                     xend=chromEnd/1e3, yend=mean,
+                     color=what),
+                 data=data.frame(seg.df, what="segments"))+
+    geom_segment(aes(chromStart/1e3, mean,
+                     xend=chromEnd/1e3, yend=mean,
                      color=what),
                  data=data.frame(bin.df, what="bins"))+
-    geom_segment(aes(peakStart/1e3, 0,
-                     color=what,
-                     xend=peakEnd/1e3, yend=0),
-                 data=data.frame(loss.best, what="peak"))+
     theme_bw()+
     theme(panel.margin=grid::unit(0, "cm"))+
-    facet_grid(sample.id ~ .)
+    facet_grid(sample.id ~ ., scales="free", labeller=function(var, val){
+      sub("McGill0", "", val)
+    })
 
   ## These need to be computed once and then they never change.
   last.cumsum.vec <- cumsum.mat[nrow(cumsum.mat), ]
@@ -291,10 +345,17 @@ multiSampleSegHeuristic <- structure(function
       one <- two.list[[sample.i]]
       left.bins <- binSum(one, left.chromStart, bases.per.bin, n.bins.zoom)
       right.bins <- binSum(one, right.chromStart, bases.per.bin, n.bins.zoom)
-      left.count <- c(left.cumsum.vec[sample.i], left.bins$count)
-      left.cumsum.mat[, sample.i] <- cumsum(left.count)
-      right.count <- c(right.cumsum.vec[sample.i], right.bins$count)
-      right.cumsum.mat[, sample.i] <- cumsum(right.count)
+      right.bins$chromEnd[right.bins$chromEnd > min.chromEnd] <- min.chromEnd
+      left.weight <- with(left.bins, chromEnd-chromStart)/bases
+      right.weight <- with(right.bins, chromEnd-chromStart)/bases
+      left.weighted.count <-
+        c(left.cumsum.vec[sample.i],
+          left.bins$count * left.weight)
+      left.cumsum.mat[, sample.i] <- cumsum(left.weighted.count)
+      right.weighted.count <-
+        c(right.cumsum.vec[sample.i],
+          right.bins$count * right.weight)
+      right.cumsum.mat[, sample.i] <- cumsum(right.weighted.count)
     }
     possible.grid <- 
     expand.grid(left.cumsum.row=3:n.cumsum, right.cumsum.row=2:n.cumsum)
@@ -319,8 +380,9 @@ multiSampleSegHeuristic <- structure(function
       seg1.cumsums <- left.cumsum.mat[model.row$left.cumsum.row-1, ]
       seg1.chromEnd <- left.chromStart.vec[model.row$left.cumsum.row-1]
       seg1.bases <- seg1.chromEnd-max.chromStart
-      seg1.means <- seg1.cumsums/seg1.bases
-      seg1.loss <- OptimalPoissonLoss(seg1.cumsums, seg1.means)
+      seg1.weight <- seg1.bases/bases
+      seg1.means <- seg1.cumsums/seg1.weight
+      seg1.loss <- OptimalPoissonLoss(seg1.cumsums, seg1.bases)
       seg.list[[paste(model.i, 1)]] <-
         data.frame(chromStart=max.chromStart, chromEnd=seg1.chromEnd,
                    mean=seg1.means, sample.id=names(two.list),
@@ -330,8 +392,9 @@ multiSampleSegHeuristic <- structure(function
       seg2.cumsums <- right.cumsum.row-seg1.cumsums
       seg2.chromEnd <- right.chromEnd.vec[model.row$right.cumsum.row-1]
       seg2.bases <- seg2.chromEnd-seg1.chromEnd
-      seg2.means <- seg2.cumsums/seg2.bases
-      seg2.loss <- OptimalPoissonLoss(seg2.cumsums, seg2.means)
+      seg2.weight <- seg2.bases/bases
+      seg2.means <- seg2.cumsums/seg2.weight
+      seg2.loss <- OptimalPoissonLoss(seg2.cumsums, seg2.bases)
       seg.list[[paste(model.i, 2)]] <-
         data.frame(chromStart=seg1.chromEnd, chromEnd=seg2.chromEnd,
                    mean=seg2.means, sample.id=names(two.list),
@@ -339,8 +402,9 @@ multiSampleSegHeuristic <- structure(function
       
       seg3.cumsums <- last.cumsum.vec-right.cumsum.row
       seg3.bases <- last.chromEnd-seg2.chromEnd
-      seg3.means <- seg3.cumsums/seg3.bases
-      seg3.loss <- OptimalPoissonLoss(seg3.cumsums, seg3.means)
+      seg3.weight <- seg3.bases/bases
+      seg3.means <- seg3.cumsums/seg3.weight
+      seg3.loss <- OptimalPoissonLoss(seg3.cumsums, seg3.bases)
       seg.list[[paste(model.i, 3)]] <-
         data.frame(chromStart=seg2.chromEnd, chromEnd=last.chromEnd,
                    mean=seg3.means, sample.id=names(two.list),
