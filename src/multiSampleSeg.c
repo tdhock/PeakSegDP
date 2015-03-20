@@ -138,7 +138,7 @@ multiSampleSegHeuristic(
   while(bases/bases_per_bin/bin_factor >= 4){
     bases_per_bin *= bin_factor;
   }
-  int n_bins = bases / bases_per_bin;
+  int n_bins = bases / bases_per_bin + 1;
   
   //printf("n_bins=%d bases_per_bin=%d\n", n_bins, bases_per_bin);
 
