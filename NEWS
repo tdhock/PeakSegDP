@@ -2,6 +2,8 @@
 
 Error checking in binSum.
 
+chrom and sample ratio features in exec/Step1.R
+
 2015.03.16
 
 multiSampleSeg Optimal and Heuristic C code.

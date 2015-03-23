@@ -71,6 +71,8 @@ setkey(sample.coverage, chrom, chromStart, chromEnd)
 
 base.dir <- sub("[.][a-zA-Z]*$", "", bedGraph.path)
 
+sample.quartile <- quantile(sample.coverage$count)
+
 features.list <- list()
 modelSelection.list <- list() # for computing test error.
 peaks.list <- list() # for computing test error.
@@ -80,6 +82,7 @@ all.problem.list <- list()# for deterimining where to keep peaks.
 for(chrom in names(regions.by.chrom)){
   chrom.regions <- regions.by.chrom[[chrom]]
   chrom.coverage <- sample.coverage[chrom]
+  chrom.quartile <- quantile(chrom.coverage$count)
   chrom.bases <- max(chrom.coverage$chromEnd)
   for(problem.size.i in 1:nrow(feasible.resolutions)){
     res.row <- feasible.resolutions[problem.size.i, ]
@@ -155,9 +158,12 @@ for(chrom in names(regions.by.chrom)){
         n.bases <- sum(bases)
         n.data <- nrow(bins)
 
+        uq <- quantile(bins$count)
         feature.vec <-
-          c(unweighted.quartile=quantile(bins$count),
+          c(unweighted.quartile=uq,
             weighted.quartile=quantile(long),
+            sample.quantile.ratio=uq/sample.quartile,
+            chrom.quantile.ratio=uq/sample.quartile,
             unweighted.mean=mean(bins$count),
             weighted.mean=mean(long),
             bases=n.bases,
