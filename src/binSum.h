@@ -1,3 +1,6 @@
+#define ERROR_CHROMSTART_NOT_LESS_THAN_CHROMEND 12
+#define ERROR_CHROMSTART_CHROMEND_MISMATCH 13
+
 int binSum
 (int *profile_chromStart, 
  int *profile_chromEnd, 

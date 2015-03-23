@@ -1,6 +1,7 @@
 /* -*- compile-command: "R CMD INSTALL .." -*- */
 
 #include "multiSampleSeg.h"
+#include "binSum.h"
 #include <R.h>
 #include <Rinternals.h>
 #include <stdlib.h>
@@ -72,7 +73,15 @@ multiSampleSegHeuristic_interface(
   int *optimal_ptr = INTEGER(optimal);
   status = multiSampleSegHeuristic(
     samples, n_profiles, n_bins_int, optimal_ptr);
-  // TODO: if known status codes...
+  if(status == ERROR_BIN_FACTOR_TOO_LARGE){
+    error("bin factor too large");
+  }
+  if(status == ERROR_CHROMSTART_NOT_LESS_THAN_CHROMEND){
+    error("chromStart not less than chromEnd");
+  }
+  if(status == ERROR_CHROMSTART_CHROMEND_MISMATCH){
+    error("chromStart[i] != chromEnd[i-1]");
+  }
   if(status != 0){
     error("unrecognized error code %d", status);
   }

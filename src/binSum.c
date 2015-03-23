@@ -9,7 +9,19 @@ int binSum
  int bin_size,
  int n_bins, 
  int bin_chromStart){
-  int profile_i = 0, bin_i = 0;
+  int profile_i, bin_i;
+  // check that chromEnd < chromStart for all profile data.
+  for(profile_i = 0; profile_i < n_profiles; profile_i++){
+    if(profile_chromEnd[profile_i] <= profile_chromStart[profile_i]){
+      return ERROR_CHROMSTART_NOT_LESS_THAN_CHROMEND;
+    }
+  }
+  // check that chromEnd[i-1] == chromStart[i] for all i>0.
+  for(profile_i = 1; profile_i < n_profiles; profile_i++){
+    if(profile_chromEnd[profile_i-1] != profile_chromStart[profile_i]){
+      return ERROR_CHROMSTART_CHROMEND_MISMATCH;
+    }
+  }
   for(bin_i = 0; bin_i < n_bins; bin_i++){
     bin_total[bin_i] = 0;
   }
@@ -18,6 +30,7 @@ int binSum
   // 1001. so we should ignore profile entries of (0, 10], (0, 1000], 
   // (999, 1000], but start counting (0, 1001], (1000, 1001], (1000, 1002].
   bin_i = 0;
+  profile_i = 0;
   while(profile_chromEnd[profile_i] <= bin_chromStart){
     profile_i ++;
   }

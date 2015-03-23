@@ -9,6 +9,7 @@ multiSampleSegHeuristic <- structure(function
   stopifnot(is.numeric(bin.factor))
   stopifnot(length(bin.factor)==1)
   if(is.data.frame(profiles)){
+    stopifnot(!is.null(profiles$sample.id))
     profiles <- split(profiles, profiles$sample.id, drop=TRUE)
   }
   stopifnot(is.list(profiles))

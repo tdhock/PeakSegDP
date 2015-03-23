@@ -16,3 +16,23 @@ test_that("with 1 sample we refine peaks" , {
   expect_equal(peak$chromStart, 10)
   expect_equal(peak$chromEnd, 30)
 })
+
+test_that("chromEnd <= chromStart is an error", {
+  bad <- data.frame(chromStart=as.integer(c(0, 100)),
+                    chromEnd=as.integer(c(100, 50)),
+                    count=0L,
+                    sample.id="foo")
+  expect_error({
+    multiSampleSegHeuristic(bad)
+  }, "chromStart not less than chromEnd")
+})
+
+test_that("chromEnd[i-1] != chromStart[i] is an error", {
+  bad <- data.frame(chromStart=as.integer(c(0, 100)),
+                    chromEnd=as.integer(c(150, 200)),
+                    count=0L,
+                    sample.id="foo")
+  expect_error({
+    multiSampleSegHeuristic(bad)
+  }, "chromStart[i] != chromEnd[i-1]", fixed=TRUE)
+})

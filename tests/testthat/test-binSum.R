@@ -111,3 +111,21 @@ test_that("binSum returns short data.frame if coverage ends", {
   expect_identical(bins$chromEnd,
                    as.integer(c(30, 60, 90, 120, 150, 180, 210)))
 })
+
+test_that("chromEnd <= chromStart is an error", {
+  bad <- data.frame(chromStart=as.integer(c(0, 10)),
+                    chromEnd=as.integer(c(10, 5)),
+                    count=0L)
+  expect_error({
+    binSum(bad, 0L, 30L, 10L)
+  }, "chromStart not less than chromEnd")
+})
+
+test_that("chromEnd[i-1] != chromStart[i] is an error", {
+  bad <- data.frame(chromStart=as.integer(c(0, 10)),
+                    chromEnd=as.integer(c(15, 20)),
+                    count=0L)
+  expect_error({
+    binSum(bad, 0L, 30L, 10L)
+  }, "chromStart[i] != chromEnd[i-1]", fixed=TRUE)
+})
