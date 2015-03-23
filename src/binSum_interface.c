@@ -18,7 +18,7 @@ void binSum_interface(
 		  bin_total,
 		  *bin_size,
 		  *n_bins,
-		  *bin_chromStart);
+		  *bin_chromStart, 0);
   if(status == ERROR_CHROMSTART_NOT_LESS_THAN_CHROMEND){
     error("chromStart not less than chromEnd");
   }

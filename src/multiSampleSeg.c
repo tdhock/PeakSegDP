@@ -152,7 +152,8 @@ multiSampleSegHeuristic(
     status = binSum(profile->chromStart, profile->chromEnd,
 		    profile->coverage, profile->n_entries,
 		    sample_count_mat + n_bins*sample_i,
-		    bases_per_bin, n_bins, max_chromStart);
+		    bases_per_bin, n_bins, max_chromStart, 
+		    ERROR_EMPTY_BIN);
     if(status != 0){
       return status;
     }
@@ -294,7 +295,8 @@ multiSampleSegHeuristic(
 		      profile->coverage, profile->n_entries,
 		      left_count_mat + n_bins_zoom*sample_i,
 		      bases_per_bin_zoom, n_bins_zoom, 
-		      left_chromStart);
+		      left_chromStart, 
+		      ERROR_EMPTY_BIN);
       if(status != 0){
 	return status;
       }
@@ -302,7 +304,8 @@ multiSampleSegHeuristic(
 		      profile->coverage, profile->n_entries,
 		      right_count_mat + n_bins_zoom*sample_i,
 		      bases_per_bin_zoom, n_bins_zoom, 
-		      right_chromStart);
+		      right_chromStart, 
+		      ERROR_EMPTY_BIN);
       if(status != 0){
 	return status;
       }
@@ -487,7 +490,11 @@ multiSampleSegOptimal(
     status = binSum(profile->chromStart, profile->chromEnd,
 		    profile->coverage, profile->n_entries,
 		    sample_count_mat + n_bases*sample_i,
-		    1, n_bases, max_chromStart);
+		    1, n_bases, max_chromStart, 
+		    ERROR_EMPTY_BIN);
+    if(status != 0){
+      return status;
+    }
   }//for sample_i
   int base_i, offset;
   int *count_vec, *cumsum_vec, cumsum_value;

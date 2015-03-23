@@ -9,7 +9,8 @@ int binSum
  int *bin_total, 
  int bin_size,
  int n_bins, 
- int bin_chromStart){
+ int bin_chromStart,
+ int status_for_empty_bin){
   int profile_i, bin_i;
   // check that chromEnd < chromStart for all profile data.
   for(profile_i = 0; profile_i < n_profiles; profile_i++){
@@ -80,11 +81,13 @@ int binSum
   }
   // If there was no data at all that overlapped a bin (not even
   // zeros), then set it to -1 to mark that.
+  int status = 0;
   for(bin_i=0; bin_i < n_bins; bin_i++){
     if(bin_touched[bin_i] == 0){
       bin_total[bin_i] = -1;
+      status = status_for_empty_bin;
     }
   }
   free(bin_touched);
-  return 0;
+  return status;
 }

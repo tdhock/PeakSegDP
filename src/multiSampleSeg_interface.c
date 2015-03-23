@@ -82,6 +82,9 @@ multiSampleSegHeuristic_interface(
   if(status == ERROR_CHROMSTART_CHROMEND_MISMATCH){
     error("chromStart[i] != chromEnd[i-1]");
   }
+  if(status == ERROR_EMPTY_BIN){
+    error("empty bin");
+  }
   if(status != 0){
     error("unrecognized error code %d", status);
   }

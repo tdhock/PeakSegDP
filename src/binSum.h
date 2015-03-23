@@ -1,5 +1,6 @@
 #define ERROR_CHROMSTART_NOT_LESS_THAN_CHROMEND 12
 #define ERROR_CHROMSTART_CHROMEND_MISMATCH 13
+#define ERROR_EMPTY_BIN 14
 
 int binSum
 (int *profile_chromStart, 
@@ -9,4 +10,5 @@ int binSum
  int *bin_total, 
  int bin_size,
  int n_bins, 
- int bin_chromStart);
+ int bin_chromStart,
+  int status_for_empty_bins);
