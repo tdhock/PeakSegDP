@@ -1,4 +1,5 @@
 #include "binSum.h"
+#include <stdlib.h>
 
 int binSum
 (int *profile_chromStart, 
@@ -22,8 +23,10 @@ int binSum
       return ERROR_CHROMSTART_CHROMEND_MISMATCH;
     }
   }
+  int *bin_touched = (int*) malloc(sizeof(int) * n_bins);
   for(bin_i = 0; bin_i < n_bins; bin_i++){
     bin_total[bin_i] = 0;
+    bin_touched[bin_i] = 0;
   }
   // bin_chromStart gives the base before the first position that we
   // want to count, for example 1000 means we want to start counting at
@@ -66,6 +69,7 @@ int binSum
     }
     bases = count_until - begin_count_after;
     bin_total[bin_i] += profile_coverage[profile_i] * bases;
+    bin_touched[bin_i] = 1;
     // setup next iteration.
     begin_count_after = count_until;
     profile_i += profile_add;
@@ -74,12 +78,13 @@ int binSum
       bin_end += bin_size;
     }
   }
-  while(bin_i < n_bins){
-    //printf("bin_i=%d bin_total[bin_i]=%d\n", bin_i, bin_total[bin_i]);
-    if(bin_total[bin_i] == 0){
+  // If there was no data at all that overlapped a bin (not even
+  // zeros), then set it to -1 to mark that.
+  for(bin_i=0; bin_i < n_bins; bin_i++){
+    if(bin_touched[bin_i] == 0){
       bin_total[bin_i] = -1;
     }
-    bin_i++;
   }
+  free(bin_touched);
   return 0;
 }

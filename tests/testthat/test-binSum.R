@@ -129,3 +129,16 @@ test_that("chromEnd[i-1] != chromStart[i] is an error", {
     binSum(bad, 0L, 30L, 10L)
   }, "chromStart[i] != chromEnd[i-1]", fixed=TRUE)
 })
+
+test_that("bin chromStart/chromEnd inside signal chromStart/chromEnd", {
+  data(H3K36me3.TDH.other.chunk3.cluster4)
+  many <- H3K36me3.TDH.other.chunk3.cluster4
+  heuristic <- multiSampleSegHeuristic(many)
+  min.chromStart <- min(many$chromStart)
+  expect_true(min.chromStart < heuristic$chromStart)
+  expect_true(min.chromStart < heuristic$chromEnd)
+  max.chromEnd <- max(many$chromEnd)
+  expect_true(heuristic$chromEnd < max.chromEnd)
+  expect_true(heuristic$chromStart < max.chromEnd)
+  with(heuristic, expect_true(chromStart < chromEnd))
+})

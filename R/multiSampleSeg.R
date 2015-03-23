@@ -171,8 +171,29 @@ multiSampleSegHeuristic <- structure(function
     theme(panel.margin=grid::unit(0, "cm"))+
     facet_grid(sample.id ~ ., scales="free")
 
+  ## This data set caused a problem in peakStart.
+  library(PeakSegDP)
+  data(H3K36me3.TDH.other.chunk3.cluster4)
+  many <- H3K36me3.TDH.other.chunk3.cluster4
+  heuristic.seconds <- system.time({
+    heuristic <- multiSampleSegHeuristic(many)
+  })[["elapsed"]]
+  min.chromStart <- min(many$chromStart)
+  max.chromEnd <- max(many$chromEnd)
+  ggplot()+
+    geom_step(aes(chromStart/1e3, count), data=many)+
+    geom_segment(aes(chromStart/1e3, 0,
+                     xend=chromEnd/1e3, yend=0),
+                 data=heuristic,
+                 color="green",
+                 size=1)+
+    theme_bw()+
+    coord_cartesian(xlim=c(min.chromStart, max.chromEnd)/1e3)+
+    theme(panel.margin=grid::unit(0, "cm"))+
+    facet_grid(sample.id ~ ., scales="free")
+
   ## Heuristic in R code for debugging.
-  profiles <- two
+  profiles <- many
   optimal.seconds <- system.time({
     optimal <- multiSampleSegOptimal(profiles)
   })[["elapsed"]]
@@ -210,6 +231,7 @@ multiSampleSegHeuristic <- structure(function
     one <- two.list[[sample.i]]
     max.count <- max(one$count)
     bins <- binSum(one, max.chromStart, bases.per.bin, n.bins)
+    stopifnot(n.bins == nrow(bins))
     extra <- binSum(one, min.chromEnd, bases.per.bin, 1L)
     if(nrow(extra) == 1){
       bins$count[nrow(bins)] <- bins$count[nrow(bins)]-extra$count
