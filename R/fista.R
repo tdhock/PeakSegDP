@@ -322,6 +322,10 @@ regularized.interval.regression <- function
   ## filter zero-variance features.
   sigma <- apply(features[has.limits,,drop=FALSE],2,sd)
   zero.var <- sigma == 0
+  if(all(zero.var)){
+    str(features)
+    stop("can't learn when all features have zero variance")
+  }
   if(any(zero.var)){
     cat("ignoring zero-variance variables:\n")
     print(names(sigma)[zero.var])
