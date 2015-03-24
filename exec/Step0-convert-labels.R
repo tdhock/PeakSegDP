@@ -6,6 +6,11 @@ argv <- commandArgs(trailingOnly=TRUE)
 
 print(argv)
 
+if(length(argv) != 1){
+  stop("usage: convert-labels.R path/to/labels.txt
+where there are path/to/celltype/*.bedGraph files")
+}
+
 labels.file <- argv[1]
 
 ann.colors <-
