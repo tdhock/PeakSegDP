@@ -1,0 +1,155 @@
+argv <-
+  system.file(file.path("exampleData", "manually_annotated_region_labels.txt"),
+              package="PeakSegDP")
+
+argv <- commandsArgs(trailingOnly=TRUE)
+
+print(argv)
+
+labels.file <- argv[1]
+
+ann.colors <-
+  c(noPeaks="#f6f4bf",
+    peakStart="#ffafaf",
+    peakEnd="#ff4c4c",
+    peaks="#a445ee")
+
+g.pos.pattern <-
+  paste0("(?<chrom>chr.+?)",
+         ":",
+         "(?<chromStart>[0-9 ,]+)",
+         "-",
+         "(?<chromEnd>[0-9 ,]+)",
+         " ",
+         "(?<annotation>[a-zA-Z]+)",
+         "(?<types>.*)")
+
+## Parse the first occurance of pattern from each of several strings
+## using (named) capturing regular expressions, returning a matrix
+## (with column names).
+str_match_perl <- function(string,pattern){
+  stopifnot(is.character(string))
+  stopifnot(is.character(pattern))
+  stopifnot(length(pattern)==1)
+  parsed <- regexpr(pattern,string,perl=TRUE)
+  captured.text <- substr(string,parsed,parsed+attr(parsed,"match.length")-1)
+  captured.text[captured.text==""] <- NA
+  captured.groups <- do.call(rbind,lapply(seq_along(string),function(i){
+    st <- attr(parsed,"capture.start")[i,]
+    if(is.na(parsed[i]) || parsed[i]==-1)return(rep(NA,length(st)))
+    substring(string[i],st,st+attr(parsed,"capture.length")[i,]-1)
+  }))
+  result <- cbind(captured.text,captured.groups)
+  colnames(result) <- c("",attr(parsed,"capture.names"))
+  result
+}
+
+## there should be bedGraph files in subdirectories under the same
+## directory as labels.file.
+bedGraph.files <- Sys.glob(file.path(dirname(labels.file), "*", "*.bedGraph"))
+bed.files <- sub("bedGraph$", "bed", bedGraph.files)
+sample.id <- sub("[.]bedGraph$", "", basename(bedGraph.files))
+cell.type <- basename(dirname(bedGraph.files))
+sample.df <- data.frame(sample.id, cell.type, bed=bed.files)
+samples.by.type <- split(sample.df, sample.df$cell.type)
+
+cat("Reading ", labels.file, "\n", sep="")
+labels.lines <- readLines(labels.file)
+is.blank <- labels.lines == ""
+chunk.id <- cumsum(is.blank)
+label.df <- data.frame(chunk.id, line=labels.lines)[!is.blank, ]
+cat(length(unique(label.df$chunk.id)), " chunks, ",
+    nrow(label.df), " label lines\n", sep="")
+
+## Error checking.
+raw.vec <- paste(label.df$line)
+line.vec <- gsub(",", "", raw.vec)
+match.mat <- str_match_perl(line.vec, g.pos.pattern)
+stopifnot(!is.na(match.mat[,1]))
+not.recognized <-
+  ! match.mat[, "annotation"] %in% c("peakStart", "peakEnd", "peaks")
+if(any(not.recognized)){
+  print(raw.vec[not.recognized])
+  print(match.mat[not.recognized, drop=FALSE])
+  stop("unrecognized annotation")
+}
+match.df <-
+  data.frame(chrom=match.mat[, "chrom"],
+             chromStart=as.integer(match.mat[, "chromStart"]),
+             chromEnd=as.integer(match.mat[, "chromEnd"]),
+             annotation=match.mat[, "annotation"],
+             types=match.mat[, "types"],
+             chunk.id=label.df$chunk.id,
+             stringsAsFactors=FALSE)
+match.by.chrom <- split(match.df, match.df$chrom)
+for(chrom in names(match.by.chrom)){
+  chrom.df <- match.by.chrom[[chrom]]
+  sorted <- chrom.df[with(chrom.df, order(chromStart, chromEnd)), ]
+  if(any(diff(sorted$chromStart) <= 0)){
+    print(sorted)
+    stop("chromStart not increasing")
+  }
+  if(any(with(sorted, chromStart >= chromEnd))){
+    print(sorted)
+    stop("chromStart >= chromEnd")
+  }
+  overlaps.next <-
+    with(sorted, chromStart[-1] < chromEnd[-length(chromEnd)])
+  if(any(overlaps.next)){
+    print(data.frame(sorted, overlaps.next=c(overlaps.next, FALSE)))
+    stop("overlapping regions")
+  }
+}
+
+cell.types <- names(samples.by.type)
+match.by.chunk <- split(match.df, match.df$chunk)
+region.list <- list()
+for(chunk.id in names(match.by.chunk)){
+  ## Check that all regions are on the same chrom.
+  chunk.df <- match.by.chunk[[chunk.id]]
+  chunkChrom <- paste(chunk.df$chrom[1])
+  if(any(chunk.df$chrom != chunkChrom)){
+    print(chunk.df)
+    stop("each chunk must span only 1 chrom")
+  }
+  stripped <- gsub(" *$", "", gsub("^ *", "", chunk.df$types))
+  type.list <- strsplit(stripped, split=" ")
+  for(ann.i in seq_along(type.list)){
+    type.vec <- type.list[[ann.i]]
+    chunk.row <- chunk.df[ann.i, ]
+    if(any(! type.vec %in% cell.types)){
+      print(chunk.row)
+      print(cell.types)
+      stop("unrecognized cell type in label")
+    }
+    is.observed <- cell.types %in% type.vec
+    observed <- cell.types[is.observed]
+    not.observed <- cell.types[!is.observed]
+    to.assign <- list()
+    ann <- chunk.row$annotation
+    to.assign[observed] <- ann
+    to.assign[not.observed] <- "noPeaks"
+    for(cell.type in names(to.assign)){
+      relevant.samples <- samples.by.type[[cell.type]]
+      annotation <- to.assign[[cell.type]]
+      sample.files <- relevant.samples$bed
+      for(sample.file in sample.files){
+        region.list[[sample.file]][[paste(chunk.id, ann.i)]] <- 
+          data.frame(chrom=chunk.row$chrom,
+                     chromStart=chunk.row$chromStart,
+                     chromEnd=chunk.row$chromEnd,
+                     annotation,
+                     chunk.id)
+      }
+    }
+  }
+}
+
+## Write bed files.
+for(bed.file in names(region.list)){
+  data.list <- region.list[[bed.file]]
+  regions <- do.call(rbind, data.list)
+  cat("Writing ", nrow(regions), " labels to ", bed.file, "\n", sep="")
+  write.table(regions, bed.file, quote=FALSE,
+              col.names=FALSE, row.names=FALSE, sep="\t")
+}
