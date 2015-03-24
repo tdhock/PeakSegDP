@@ -3,21 +3,17 @@ library(ggplot2)
 library(PeakSegDP)
 
 argv <- c("/home/thocking/genomelabels/H3K36me3_TDH_immune/")
-argv <- c("/home/thocking/genomelabels/H3K36me3_AM_immune/")
-
-  c("/home/thocking/genomelabels/H3K36me3_TDH_immune.RData", #outfile.
-    ##Infiles:
-    "/home/thocking/genomelabels/H3K36me3_TDH_immune/McGill0104.RData", 
-    "/home/thocking/genomelabels/H3K36me3_TDH_immune/McGill0322.RData")
+argv <- c("~/lib/R/library/PeakSegDP/exampleData/")
 
 argv <- commandArgs(trailingOnly=TRUE)
 
-no.trailing <- normalizePath(argv)
-RData.files <- Sys.glob(file.path(no.trailing, "*.RData"))
+no.trailing <- normalizePath(argv, mustWork=TRUE)
+RData.files <- Sys.glob(file.path(no.trailing, "*", "*.RData"))
 cat("Input files:\n")
 print(RData.files)
+stopifnot(length(RData.files) > 0)
 names(RData.files) <- sub("[.]RData$", "", basename(RData.files))
-out.RData <- paste0(no.trailing, ".RData")
+out.RData <- file.path(no.trailing, "learned.model.RData")
 cat("Output file:\n", out.RData, "\n", sep="")
 
 error.list <- list()
@@ -32,16 +28,16 @@ for(sample.id in names(RData.files)){
 errors <- do.call(rbind, error.list)
 res.errors <- 
   errors[,
-         .(errors=sum(errors),
-           regions=sum(regions)),
+         .(weighted.error=sum(weighted.error),
+           total.weight=sum(total.weight)),
          by=bases.per.bin]
-ggplot(res.errors, aes(bases.per.bin, errors))+
+ggplot(res.errors, aes(bases.per.bin, weighted.error))+
   geom_line()+
   scale_x_log10()+
   geom_point()
 
 ## There could be several minimum error resolutions.
-min.err <- res.errors[errors == min(errors), ]
+min.err <- res.errors[weighted.error == min(weighted.error), ]
 
 ## The largest resolution will take the least amount of CPU time.
 bases.per.bin <- max(min.err$bases.per.bin)
@@ -63,7 +59,7 @@ for(sample.id in names(features.limits.list)){
   one.res <- features.limits.list[[sample.id]][[bases.per.bin.str]]
   for(chunk.id in names(one.res$limits)){
     limits <- one.res$limits[[chunk.id]]
-    features <- one.res$features[rownames(limits), ]
+    features <- one.res$features[rownames(limits), ,drop=FALSE]
     rownames(limits) <- rownames(features) <-
       paste(sample.id, chunk.id, rownames(limits))
     chunk.sample.list[[chunk.id]][[sample.id]] <-
@@ -107,11 +103,12 @@ for(validation.fold in folds){
       set.data[[set.name]][[data.type]] <- do.call(rbind, mats)
     }
   }
-  all.features <- set.data$train$features
+  all.train.features <- set.data$train$features
+  all.features <- rbind(all.train.features, set.data$validation$features)
   is.na.col <- apply(is.na(all.features), 2, any)
   is.inf.col <- apply(!is.finite(all.features), 2, any)
   ignore <- is.na.col | is.inf.col
-  not.na <- all.features[, !ignore]
+  not.na <- all.train.features[, !ignore]
   fit <-
   regularized.interval.regression(features=not.na,
                                   limits=set.data$train$limits,
@@ -171,7 +168,7 @@ ignore <- is.na.col | is.inf.col
 not.na <- all.features[, !ignore]
 all.limits <- do.call(rbind, lapply(chunk.mats, "[[", "limits"))
 stopifnot(rownames(not.na) == rownames(all.limits))
-fit <-
+learned.model <-
   smooth.interval.regression(features=not.na,
                              limits=all.limits,
                              gamma=best.gamma,
@@ -181,4 +178,4 @@ fit <-
 
 ## Save the learned resolution (bases.per.bin) and the inteval
 ## regression penalty function prediction model.
-save(fit, bases.per.bin, file=out.RData)
+save(learned.model, bases.per.bin, file=out.RData)
