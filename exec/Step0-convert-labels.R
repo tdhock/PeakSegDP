@@ -2,7 +2,7 @@ argv <-
   system.file(file.path("exampleData", "manually_annotated_region_labels.txt"),
               package="PeakSegDP")
 
-argv <- commandsArgs(trailingOnly=TRUE)
+argv <- commandArgs(trailingOnly=TRUE)
 
 print(argv)
 
