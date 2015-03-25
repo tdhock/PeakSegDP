@@ -141,7 +141,8 @@ for(chrom in names(regions.by.chrom)){
                    bin.chromStart=problem.regions$chromStart[1],
                    bin.size=bases.per.bin)
         })[["elapsed"]]
-        
+
+        probPlot <- 
         ggplot()+
           geom_tallrect(aes(xmin=i.chromStart/1e3, xmax=i.chromEnd/1e3,
                             fill=annotation),
@@ -153,6 +154,11 @@ for(chrom in names(regions.by.chrom)){
           theme_bw()+
           theme(panel.margin=grid::unit(0, "cm"))+
           facet_grid(chunk.id ~ .)
+        png.path <- sub("RData", "png", RData.path)
+        
+        png(png.path, units="in", res=200, width=10, height=7)
+        print(probPlot)
+        dev.off()
         
         cDPA.seconds <- system.time({
           fit <- PeakSegDP(bins, maxPeaks = 9L)
@@ -267,10 +273,15 @@ res.errors <-
 exp.weight <- rep(res.errors$total.weight[1], nrow(res.errors))
 stopifnot(all.equal(res.errors$total.weight, exp.weight))
 
+sampleError <- 
 ggplot(res.errors, aes(bases.per.bin, weighted.error))+
   geom_line()+
   geom_point()+
   scale_x_log10()
+error.pdf <- sub("[.]bedGraph$", "_weightedError.pdf", bedGraph.path)
+pdf(error.pdf)
+print(sampleError)
+dev.off()
 
 features.limits <- list()
 for(bases.per.bin.str in names(features.list)){

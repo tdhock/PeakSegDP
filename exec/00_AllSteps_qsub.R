@@ -71,11 +71,12 @@ script.txt <-
 #PBS -e ", learned.base, ".err
 #PBS -V                                        
 #PBS -N learned.model
-", Rscript, " ", Step2, " ", bedGraph.path, " ", labels.file)
-script.file <- paste0(residuals.base, ".sh")
+", Rscript, " ", Step2, " ", data.dir)
+script.file <- paste0(learned.base, ".sh")
 cat(script.txt, file=script.file)
 cmd <- paste("qsub", script.file)
 qsub.out <- system(cmd, intern=TRUE)
 qsub.id <- sub("[.].*", "", qsub.out)
 cat("started job ", qsub.id, "\n", sep="")
 
+## Step3: genome-wide peak prediction.

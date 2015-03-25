@@ -31,10 +31,17 @@ res.errors <-
          .(weighted.error=sum(weighted.error),
            total.weight=sum(total.weight)),
          by=bases.per.bin]
+
+errPlot <- 
 ggplot(res.errors, aes(bases.per.bin, weighted.error))+
   geom_line()+
   scale_x_log10()+
   geom_point()
+
+error.pdf <- file.path(no.trailing, "figure-weightedError.pdf")
+pdf(error.pdf)
+print(errPlot)
+dev.off()
 
 ## consider only resolutions with max weights.
 max.weight.value <- max(res.errors$total.weight)
@@ -92,7 +99,7 @@ for(chunk.id in names(chunk.sample.list)){
 ## we can split on for cross-validation.
 
 set.seed(1)
-n.folds <- 4
+n.folds <- min(length(chunk.mats), 5)
 folds <- 1:n.folds
 fold.id <- sample(rep(folds, l=length(chunk.mats)))
 eval.error.list <- list()
@@ -141,18 +148,6 @@ for(validation.fold in folds){
 }
 
 eval.error <- do.call(rbind, eval.error.list)
-no.facets <- 
-ggplot()+
-  theme_bw()+
-  theme(panel.margin=grid::unit(0, "cm"))+
-  geom_line(aes(-log10(gamma), percent.error,
-                group=interaction(set.name, validation.fold),
-                linetype=set.name),
-            data=eval.error)
-with.facets <-
-  no.facets+
-  facet_grid(validation.fold ~ .)
-
 setkey(eval.error, set.name)
 vali.error <- eval.error["validation"]
 vali.error[, min.err := min(errors), by=validation.fold]
@@ -161,6 +156,26 @@ gamma.dt <-
   best.err[, .(min.gamma=min(gamma),
                max.gamma=max(gamma)),
            by=validation.fold]
+
+no.facets <- 
+ggplot()+
+  geom_vline(aes(xintercept=-log10(max.gamma)), data=gamma.dt)+
+  theme_bw()+
+  theme(panel.margin=grid::unit(0, "cm"))+
+  geom_line(aes(-log10(gamma), percent.error,
+                group=interaction(set.name, validation.fold),
+                linetype=set.name),
+            data=eval.error)
+with.facets <-
+  no.facets+
+  facet_grid(validation.fold ~ ., labeller=function(var, val){
+    paste("fold", val)
+  })
+modelSelection.pdf <- file.path(no.trailing, "figure-modelSelection.pdf")
+pdf(modelSelection.pdf)
+print(with.facets)
+dev.off()
+
 gamma.vals <- gamma.dt$max.gamma
 
 best.gamma <- mean(gamma.vals)
