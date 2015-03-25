@@ -189,10 +189,12 @@ for(chrom in names(regions.by.chrom)){
       all.loss$cummin <- cummin(all.loss$error)
       loss <- subset(all.loss, error == cummin)
       rownames(loss) <- loss$segments
-      exact <- with(loss, exactModelSelection(error, segments))
-      exact$segments <- exact$model.complexity
-      rownames(exact) <- exact$segments
-      exact$peaks <- loss[paste(exact$segments), "peaks"]
+      bases <- with(fit$segments[1,], chromEnd-chromStart)
+      in.sqrt <- 1.1 + log(bases / loss$segments)
+      in.square <- 1 + 4 * sqrt(in.sqrt)
+      complexity <- in.square * in.square * loss$segments
+      
+      exact <- with(loss, exactModelSelection(error, complexity, peaks))
 
       ## To map a predicted penalty value back to peaks, we need to
       ## store the exact model selection function and the list of
