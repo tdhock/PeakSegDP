@@ -55,5 +55,27 @@ for(labels.file in labels.files){
   residual.qsub.id.list[[script.file]] <- qsub.id
 }
 
-"#PBS -W depend=afterok:<JOBID>:<JOBID>:<JOBID>"
+## Step2 learning depends on Step1.
+Step2 <-
+  system.file(file.path("exec", "Step2-learn-model-complexity.R"),
+              package="PeakSegDP")
+residual.qsub.id.txt <- paste(residual.qsub.id.list, collapse=":")
+learned.base <- file.path(data.dir, "learned.model")
+script.txt <-
+  paste0("#!/bin/bash
+#PBS -l nodes=1:ppn=4
+#PBS -l walltime=12:00:00                      
+#PBS -A bws-221-ae
+#PBS -W depend=afterok:", residual.qsub.id.txt, "
+#PBS -o ", learned.base, ".out
+#PBS -e ", learned.base, ".err
+#PBS -V                                        
+#PBS -N learned.model
+", Rscript, " ", Step2, " ", bedGraph.path, " ", labels.file)
+script.file <- paste0(residuals.base, ".sh")
+cat(script.txt, file=script.file)
+cmd <- paste("qsub", script.file)
+qsub.out <- system(cmd, intern=TRUE)
+qsub.id <- sub("[.].*", "", qsub.out)
+cat("started job ", qsub.id, "\n", sep="")
 
