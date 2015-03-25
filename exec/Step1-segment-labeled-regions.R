@@ -277,7 +277,7 @@ for(chrom in names(regions.by.chrom)){
                              alpha=0.5,
                              data=show.errors)+
                scale_fill_manual(values=ann.colors)+
-               geom_step(aes(chromStart/1e3, count),
+               geom_line(aes(chromStart/1e3, count),
                          data=bins)+
                facet_grid(chunk.id ~ ., labeller=function(var, val){
                  paste("chunk", val)
