@@ -154,7 +154,10 @@ for(chrom in names(regions.by.chrom)){
           theme_bw()+
           theme(panel.margin=grid::unit(0, "cm"))+
           facet_grid(chunk.id ~ .)
+
         png.path <- sub("RData", "png", RData.path)
+        RData.dir <- dirname(RData.path)
+        dir.create(RData.dir, showWarnings = FALSE, recursive = TRUE)
         
         png(png.path, units="in", res=200, width=10, height=7)
         print(probPlot)
@@ -189,8 +192,6 @@ for(chrom in names(regions.by.chrom)){
             log=log(feature.vec),
             log.log=log(log(feature.vec)))
 
-        RData.dir <- dirname(RData.path)
-        dir.create(RData.dir, showWarnings = FALSE, recursive = TRUE)
         save(fit, features,
              binSum.seconds, cDPA.seconds,
              file=RData.path)
