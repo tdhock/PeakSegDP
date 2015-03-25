@@ -17,3 +17,22 @@ example(clusterPeaks)
 example(multiSampleSegHeuristic)
 #+END_SRC
 
+** Detecting peaks in several samples over the whole genome using a qsub pipeline
+
+First, plot several data sets (in [[%20https://www.broadinstitute.org/igv/][IGV]] or on [[http://genome.ucsc.edu/cgi-bin/hgGateway][UCSC]]) and visually
+identify several regions with and without peaks, saving those labels
+to a file ([[file:inst/exampleData/manually_annotated_region_labels.txt][example]]).
+
+Then, put that label file in the same directory as several
+subdirectories that have names that match the labels file ([[file:inst/exampleData/][example]]).
+
+Then, download and run the pipeline R script, which requires a cluster
+with qsub.
+
+#+BEGIN_SRC shell
+wget https://raw.githubusercontent.com/tdhock/PeakSegDP/master/exec/00_AllSteps_qsub.R
+## Edit to reflect your cluster configuration!
+Rscript 00_AllSteps_qsub.R path/to/labels.txt
+#+END_SRC
+
+Otherwise, run the [[file:exec/][steps]] individually.
