@@ -36,6 +36,13 @@ argv <-
   c("/home/thocking/genomecov/H3K4me3/McGill0001.bedGraph",
     "/home/thocking/genomelabels/H3K4me3_PGP_immune/McGill0001.bed")
 
+base <-
+  file.path(system.file("exampleData", package="PeakSegDP"),
+            "bcell", "McGill0091")
+argv <-
+  c(paste0(base, ".bedGraph"),
+    paste0(base, "_labels.bed"))
+
 argv <- commandArgs(trailingOnly=TRUE)
 
 print(argv)

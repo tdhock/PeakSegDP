@@ -126,7 +126,7 @@ for(chunk.id in names(match.by.chunk)){
     print(chunk.df)
     stop("each chunk must span only 1 chrom")
   }
-  for(ann.i in seq_along(type.list)){
+  for(ann.i in 1:nrow(chunk.df)){
     chunk.row <- chunk.df[ann.i, ]
     type.vec <- type.list[[rownames(chunk.row)]]
     is.observed <- cell.types %in% type.vec
