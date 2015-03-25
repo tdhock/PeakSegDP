@@ -52,7 +52,7 @@ str_match_perl <- function(string,pattern){
 ## there should be bedGraph files in subdirectories under the same
 ## directory as labels.file.
 bedGraph.files <- Sys.glob(file.path(dirname(labels.file), "*", "*.bedGraph"))
-bed.files <- sub("bedGraph$", "bed", bedGraph.files)
+bed.files <- sub("[.]bedGraph$", "_labels.bed", bedGraph.files)
 sample.id <- sub("[.]bedGraph$", "", basename(bedGraph.files))
 cell.type <- basename(dirname(bedGraph.files))
 sample.df <- data.frame(sample.id, cell.type, bed=bed.files)
@@ -106,7 +106,16 @@ for(chrom in names(match.by.chrom)){
   }
 }
 
-cell.types <- names(samples.by.type)
+## determine total set of cell types with positive=Peak annotations.
+stripped <- gsub(" *$", "", gsub("^ *", "", match.df$types))
+type.list <- strsplit(stripped, split=" ")
+names(type.list) <- rownames(match.df)
+cell.types <- unique(unlist(type.list))
+cat("cell types with peak annotations: ",
+    paste(cell.types, collapse=", "),
+    "\n",
+    sep="")
+
 match.by.chunk <- split(match.df, match.df$chunk)
 region.list <- list()
 for(chunk.id in names(match.by.chunk)){
@@ -117,16 +126,9 @@ for(chunk.id in names(match.by.chunk)){
     print(chunk.df)
     stop("each chunk must span only 1 chrom")
   }
-  stripped <- gsub(" *$", "", gsub("^ *", "", chunk.df$types))
-  type.list <- strsplit(stripped, split=" ")
   for(ann.i in seq_along(type.list)){
-    type.vec <- type.list[[ann.i]]
     chunk.row <- chunk.df[ann.i, ]
-    if(any(! type.vec %in% cell.types)){
-      print(chunk.row)
-      print(cell.types)
-      stop("unrecognized cell type in label")
-    }
+    type.vec <- type.list[[rownames(chunk.row)]]
     is.observed <- cell.types %in% type.vec
     observed <- cell.types[is.observed]
     not.observed <- cell.types[!is.observed]

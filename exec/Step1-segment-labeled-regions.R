@@ -279,7 +279,7 @@ for(bases.per.bin.str in names(features.list)){
          peaks=peaks.list[[bases.per.bin.str]])#list[problem]
 }
 
-out.RData <- sub("[^.]*$", "RData", bed.path)
+out.RData <- sub("[.]bedGraph$", "_residuals.RData", bedGraph.path)
 save(features.limits, # used for the learning/training.
      ## (limits separated by chunk for cross-validation).
      errors, # used for selecting the best resolution before training.
