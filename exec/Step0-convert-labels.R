@@ -116,7 +116,7 @@ cat("cell types with peak annotations: ",
     "\n",
     sep="")
 
-match.by.chunk <- split(match.df, match.df$chunk)
+match.by.chunk <- split(match.df, match.df$chunk.id)
 region.list <- list()
 for(chunk.id in names(match.by.chunk)){
   ## Check that all regions are on the same chrom.
