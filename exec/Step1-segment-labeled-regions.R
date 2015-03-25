@@ -22,6 +22,7 @@ ann.colors <-
     peaks="#a445ee")
 
 library(PeakError)
+library(animint)
 library(PeakSegDP)
 library(ggplot2)
 library(data.table) #"1.9.4",
@@ -47,8 +48,8 @@ argv <- commandArgs(trailingOnly=TRUE)
 
 print(argv)
 
-bedGraph.path <- argv[1]
-bed.path <- argv[2]
+bedGraph.path <- normalizePath(argv[1], mustWork=TRUE)
+bed.path <- normalizePath(argv[2], mustWork=TRUE)
 
 regions.wide <- fread(bed.path)
 region.names <- c("chrom", "chromStart", "chromEnd", "annotation", "chunk.id")
@@ -131,6 +132,8 @@ for(chrom in names(regions.by.chrom)){
       RData.base <- paste0(problem.name, ".RData")
       RData.path <- file.path(chrom.dir, RData.base)
       problem.regions <- problem.list[[problem.name]]
+      RData.dir <- dirname(RData.path)
+      dir.create(RData.dir, showWarnings = FALSE, recursive = TRUE)
       if(file.exists(RData.path)){
         load(RData.path)
       }else{
@@ -142,27 +145,6 @@ for(chrom in names(regions.by.chrom)){
                    bin.size=bases.per.bin)
         })[["elapsed"]]
 
-        probPlot <- 
-        ggplot()+
-          geom_tallrect(aes(xmin=i.chromStart/1e3, xmax=i.chromEnd/1e3,
-                            fill=annotation),
-                        color="grey",
-                        data=problem.regions)+
-          scale_fill_manual(values=ann.colors)+
-          geom_step(aes(chromStart/1e3, count),
-                    data=bins)+
-          theme_bw()+
-          theme(panel.margin=grid::unit(0, "cm"))+
-          facet_grid(chunk.id ~ .)
-
-        png.path <- sub("RData", "png", RData.path)
-        RData.dir <- dirname(RData.path)
-        dir.create(RData.dir, showWarnings = FALSE, recursive = TRUE)
-        
-        png(png.path, units="in", res=200, width=10, height=7)
-        print(probPlot)
-        dev.off()
-        
         cDPA.seconds <- system.time({
           fit <- PeakSegDP(bins, maxPeaks = 9L)
         })[["elapsed"]]
@@ -185,14 +167,16 @@ for(chrom in names(regions.by.chrom)){
             unweighted.mean=mean(bins$count),
             weighted.mean=mean(long),
             bases=n.bases,
-            data=n.data)        
-        features <-
-          c(feature.vec,
-            `log+1`=log(feature.vec+1),
-            log=log(feature.vec),
-            log.log=log(log(feature.vec)))
+            data=n.data)
+        suppressWarnings({
+          features <-
+            c(feature.vec,
+              `log+1`=log(feature.vec+1),
+              log=log(feature.vec),
+              log.log=log(log(feature.vec)))
+        })
 
-        save(fit, features,
+        save(fit, features, bins,
              binSum.seconds, cDPA.seconds,
              file=RData.path)
       }#if(file.exists(RData.path))/else
@@ -221,6 +205,10 @@ for(chrom in names(regions.by.chrom)){
       problem.regions[, chromStart := i.chromStart ]
       problem.regions[, chromEnd := i.chromEnd ]
       chunk.list <- split(problem.regions, problem.regions$chunk.id)
+
+      show.error.list <- list()
+      show.param.list <- list()
+      show.exact.list <- list()
       for(chunk.id in names(chunk.list)){
         chunk.regions <- chunk.list[[chunk.id]]
         for(param.name in rownames(exact)){
@@ -228,8 +216,17 @@ for(chrom in names(regions.by.chrom)){
           error <- PeakErrorChrom(param.peaks, chunk.regions)
           error$weight <- chunk.regions$weight
           error$weighted.error <- with(error, weight * (fp+fn))
+          show.error.list[[paste(chunk.id, param.name)]] <-
+            data.frame(chunk.id, peaks=param.name, error)
           exact[param.name, "weighted.error"] <- sum(error$weighted.error)
         }
+        show.exact.list[[chunk.id]] <- data.frame(chunk.id, exact)
+        ## For visualization, store the minimum error model with the
+        ## least peaks.
+        min.exact <- subset(exact, weighted.error == min(weighted.error))
+        show.param.list[[chunk.id]] <- paste(min(min.exact$peaks))
+
+        ## For learning, store the optimal interval of penalty values.
         limits <- with(exact, {
           largestContinuousMinimum(weighted.error,
                                    max.log.lambda-min.log.lambda)
@@ -257,6 +254,76 @@ for(chrom in names(regions.by.chrom)){
           check.list[[paste(bases.per.bin, problem.name, chunk.id)]] <-
             result.dt
       }#chunk.id
+      show.exact <- do.call(rbind, show.exact.list)
+      show.peaks <- do.call(rbind, fit$peaks)
+      show.errors <- do.call(rbind, show.error.list)
+      tit <- sub(dirname(dirname(bedGraph.path)), "", RData.path)
+      viz <- 
+        list(profile=ggplot()+
+               ggtitle(tit)+
+               xlab(paste("position on",
+                          chrom,
+                          "(kilo bases = kb)"))+
+               guides(linetype=guide_legend(order=2,
+                        override.aes=list(fill="white")))+
+               scale_linetype_manual("error type", 
+                                     values=c(correct=0,
+                                       "false negative"=3,
+                                       "false positive"=1))+
+               geom_tallrect(aes(xmin=chromStart/1e3, xmax=chromEnd/1e3,
+                                 showSelected=peaks,
+                                 linetype=status,
+                                 fill=annotation),
+                             alpha=0.5,
+                             data=show.errors)+
+               scale_fill_manual(values=ann.colors)+
+               geom_step(aes(chromStart/1e3, count),
+                         data=bins)+
+               facet_grid(chunk.id ~ ., labeller=function(var, val){
+                 paste("chunk", val)
+               })+
+               theme_animint(width=1500),
+
+             title=tit,
+
+             first=list(peaks=show.param.list[[1]]),
+
+             selection=ggplot()+
+             geom_segment(aes(min.log.lambda, weighted.error,
+                              xend=max.log.lambda, yend=weighted.error),
+                          data=show.exact)+
+             scale_y_continuous(limits=c(0, NA))+
+             facet_grid(chunk.id ~ ., labeller=function(var, val){
+               paste("chunk", val)
+             })+
+             xlab("penalty log(lambda)")+
+             geom_tallrect(aes(xmin=min.log.lambda, xmax=max.log.lambda,
+                               clickSelects=peaks),
+                           alpha=0.5,
+                           data=show.exact))
+      png.path <- sub("RData", "png", RData.path)
+      png(png.path, units="in", res=200, width=15, height=4)
+      print(viz$profile)
+      dev.off()
+      thumb.path <- sub("[.]png", "-thumb.png", png.path)
+      cmd <- sprintf("convert %s -resize 230 %s", png.path, thumb.path)
+      system(cmd)
+      if(is.data.frame(show.peaks) && nrow(show.peaks)){
+        viz$profile <- viz$profile+
+          geom_segment(aes(chromStart/1e3, 0,
+                           showSelected=peaks,
+                           xend=chromEnd/1e3, yend=0),
+                       data=show.peaks,
+                       size=4,
+                       color="deepskyblue")+
+          geom_point(aes(chromStart/1e3, 0,
+                         showSelected=peaks),
+                     data=show.peaks,
+                     size=5,
+                     color="deepskyblue")
+      }
+      viz.path <- sub("[.]RData$", "", RData.path)
+      animint2dir(viz, out.dir=viz.path)
     }#problem.name
     check.dt <- do.call(rbind, check.list)
     stopifnot(all.equal(sum(check.dt$total.weight),
@@ -279,8 +346,8 @@ ggplot(res.errors, aes(bases.per.bin, weighted.error))+
   geom_line()+
   geom_point()+
   scale_x_log10()
-error.pdf <- sub("[.]bedGraph$", "_weightedError.pdf", bedGraph.path)
-pdf(error.pdf)
+error.png <- sub("[.]bedGraph$", "_weightedError.png", bedGraph.path)
+png(error.png, units="in", res=200, width=12, height=7)
 print(sampleError)
 dev.off()
 
