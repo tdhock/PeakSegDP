@@ -21,10 +21,13 @@ example(multiSampleSegHeuristic)
 
 First, plot several data sets (in [[%20https://www.broadinstitute.org/igv/][IGV]] or on [[http://genome.ucsc.edu/cgi-bin/hgGateway][UCSC]]) and visually
 identify several regions with and without peaks, saving those labels
-to a file ([[file:inst/exampleData/manually_annotated_region_labels.txt][example]]).
+to a file. [[file:inst/exampleData/manually_annotated_region_labels.txt][Example]]: there are two samples each for two cell types,
+bcell and tcell.
 
 Then, put that label file in the same directory as several
-subdirectories that have names that match the labels file ([[file:inst/exampleData/][example]]).
+subdirectories that have names that match the labels file. [[file:inst/exampleData/][Example]]:
+the tcell subdirectory contains two bedGraph files, and the bcell
+subdirectory contains two bedGraph files.
 
 Then, download and run the pipeline R script, which requires a cluster
 with qsub.
