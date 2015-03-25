@@ -3,7 +3,7 @@ library(ggplot2)
 library(PeakSegDP)
 
 argv <- c("/home/thocking/genomelabels/H3K36me3_TDH_immune/")
-argv <- c("~/lib/R/library/PeakSegDP/exampleData/")
+argv <- system.file("exampleData", package="PeakSegDP")
 
 argv <- commandArgs(trailingOnly=TRUE)
 
@@ -36,8 +36,13 @@ ggplot(res.errors, aes(bases.per.bin, weighted.error))+
   scale_x_log10()+
   geom_point()
 
+## consider only resolutions with max weights.
+max.weight.value <- max(res.errors$total.weight)
+max.weight <- res.errors[total.weight == max.weight.value, ]
+
 ## There could be several minimum error resolutions.
-min.err <- res.errors[weighted.error == min(weighted.error), ]
+min.err.value <- min(max.weight$weighted.error)
+min.err <- max.weight[weighted.error == min.err.value, ]
 
 ## The largest resolution will take the least amount of CPU time.
 bases.per.bin <- max(min.err$bases.per.bin)
