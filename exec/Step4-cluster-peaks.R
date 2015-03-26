@@ -1,4 +1,5 @@
 library(data.table)
+library(ggplot2)
 library(xtable)
 library(PeakSegDP)
 library(PeakError)
@@ -39,8 +40,6 @@ for(bed.file in bed.files){
         data.table(sample.id, one.dt)
     }
   }
-  peak.list[[sample.id]] <- data.table(sample.id, peaks)
-  region.list[[sample.id]] <- data.table(sample.id, regions)
 }
 
 ann.colors <-
