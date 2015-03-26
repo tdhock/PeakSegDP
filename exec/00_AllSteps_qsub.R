@@ -50,9 +50,9 @@ for(labels.file in labels.files){
   cat(script.txt, file=script.file)
   cmd <- paste("qsub", script.file)
   qsub.out <- system(cmd, intern=TRUE)
-  qsub.id <- sub("[.].*", "", qsub.out)
-  cat("started job ", qsub.id, "\n", sep="")
-  residual.qsub.id.list[[script.file]] <- qsub.id
+  residual.qsub.id <- sub("[.].*", "", qsub.out)
+  cat("started job ", residual.qsub.id, "\n", sep="")
+  residual.qsub.id.list[[script.file]] <- residual.qsub.id
 }
 
 ## Step2 learning depends on Step1.
@@ -76,8 +76,8 @@ script.file <- paste0(learned.base, ".sh")
 cat(script.txt, file=script.file)
 cmd <- paste("qsub", script.file)
 qsub.out <- system(cmd, intern=TRUE)
-qsub.id <- sub("[.].*", "", qsub.out)
-cat("started job ", qsub.id, "\n", sep="")
+learned.qsub.id <- sub("[.].*", "", qsub.out)
+cat("started job ", learned.qsub.id, "\n", sep="")
 
 ## Step3: genome-wide peak prediction.
 Step3 <-
@@ -93,7 +93,7 @@ for(bedGraph.file in bedGraph.files){
 #PBS -l nodes=1:ppn=4
 #PBS -l walltime=12:00:00                      
 #PBS -A bws-221-ae
-#PBS -W depend=afterok:", qsub.id, "
+#PBS -W depend=afterok:", learned.qsub.id, "
 #PBS -o ", peaks.base, ".out
 #PBS -e ", peaks.base, ".err
 #PBS -V                                        
@@ -103,7 +103,10 @@ for(bedGraph.file in bedGraph.files){
   cat(script.txt, file=script.file)
   cmd <- paste("qsub", script.file)
   qsub.out <- system(cmd, intern=TRUE)
-  qsub.id <- sub("[.].*", "", qsub.out)
-  cat("started job ", qsub.id, "\n", sep="")
-  peak.qsub.id.list[[script.file]] <- qsub.id
+  peak.qsub.id <- sub("[.].*", "", qsub.out)
+  cat("started job ", peak.qsub.id, "\n", sep="")
+  peak.qsub.id.list[[script.file]] <- peak.qsub.id
 }
+
+## Step4: model visualization and peak clustering.
+
