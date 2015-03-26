@@ -2,6 +2,8 @@ argv <-
   system.file(file.path("exampleData", "manually_annotated_region_labels.txt"),
               package="PeakSegDP")
 
+argv <- "/gs/project/mugqic/epigenome/pipelines/atac_seq/v_1/EMC_Temporal_Change/hg19/toby_peak_calling/toby_chunks"
+
 argv <- commandArgs(trailingOnly=TRUE)
 
 print(argv)
@@ -72,7 +74,7 @@ line.vec <- gsub(",", "", raw.vec)
 match.mat <- str_match_perl(line.vec, g.pos.pattern)
 stopifnot(!is.na(match.mat[,1]))
 not.recognized <-
-  ! match.mat[, "annotation"] %in% c("peakStart", "peakEnd", "peaks")
+  ! match.mat[, "annotation"] %in% c("peakStart", "peakEnd", "peaks", "noPeaks")
 if(any(not.recognized)){
   print(raw.vec[not.recognized])
   print(match.mat[not.recognized, drop=FALSE])
@@ -90,8 +92,10 @@ match.by.chrom <- split(match.df, match.df$chrom)
 for(chrom in names(match.by.chrom)){
   chrom.df <- match.by.chrom[[chrom]]
   sorted <- chrom.df[with(chrom.df, order(chromStart, chromEnd)), ]
-  if(any(diff(sorted$chromStart) <= 0)){
-    print(sorted)
+  same.as.next <- diff(sorted$chromStart) <= 0
+  if(any(same.as.next)){
+    bad.i <- which(same.as.next)
+    print(sorted[c(bad.i, bad.i+1), ])
     stop("chromStart not increasing")
   }
   if(any(with(sorted, chromStart >= chromEnd))){
