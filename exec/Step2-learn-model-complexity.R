@@ -1,3 +1,4 @@
+library(animint)
 library(data.table)
 library(xtable)
 library(ggplot2)
@@ -47,7 +48,6 @@ bases.per.bin <- bases.per.bin.dt$bases.per.bin
 bases.per.bin.str <- paste(bases.per.bin)
 
 y.range <- max(max.weight$weighted.error)-min.err.value
-
 errPlot <- 
 ggplot()+
   ggtitle("selecting the best resolution")+
@@ -55,28 +55,133 @@ ggplot()+
   geom_point(aes(bases.per.bin, weighted.error), data=bases.per.bin.dt)+
   geom_text(aes(bases.per.bin, weighted.error-y.range/20,
                 label=paste(bases.per.bin, "bases/bin")),
-            hjust=1,
             data=bases.per.bin.dt)+
   scale_x_log10()+
   theme_grey()
 
+## idea is to make train-figures directory with index.html, several
+## png files and several animint data viz, which is easily copyable
+## for sharing results.
+figures.dir <- "train-figures"
 error.base <- "figure-weightedError.png"
-error.png <- file.path(no.trailing, error.base)
+figures.path <- file.path(no.trailing, figures.dir)
+dir.create(figures.path, showWarnings = FALSE)
+error.png <- file.path(figures.path, error.base)
 png(error.png, units="in", res=100, width=5, height=3)
 print(errPlot)
 dev.off()
 
+ann.colors <-
+  c(noPeaks="#f6f4bf",
+    peakStart="#ffafaf",
+    peakEnd="#ff4c4c",
+    peaks="#a445ee")
+
+## Now that we know what is the best resolution, make some plots that
+## show the training model residuals at that resolution.
+for(sample.id in names(features.limits.list)){
+  sample.data <- features.limits.list[[sample.id]][[bases.per.bin.str]]
+  exact.list <- sample.data$modelSelection
+  for(problem.name in names(exact.list)){
+    exact <- exact.list[[problem.name]]
+    weighted.error.mat <- sample.data$weighted.error.mats[[problem.name]]
+    show.error.list <- list()
+    show.param.list <- list()
+    show.exact.list <- list()
+    for(chunk.id in colnames(weighted.error.mat)){
+      exact$weighted.error <- weighted.error.mat[, chunk.id]
+      show.exact.list[[chunk.id]] <- data.frame(chunk.id, exact)
+      best <- subset(exact, weighted.error == min(weighted.error))
+      show.param.list[[chunk.id]] <- paste(min(best$peaks))
+      error.region.list <- sample.data$error.regions[[problem.name]][[chunk.id]]
+      show.error.list[[chunk.id]] <- do.call(rbind, error.region.list)
+    }#chunk.id
+    show.exact <- do.call(rbind, show.exact.list)
+    show.peaks <- do.call(rbind, sample.data$peaks[[problem.name]])
+    show.errors <- do.call(rbind, show.error.list)
+    bins <- sample.data$bins[[problem.name]]
+    problem.path <- file.path(figures.path, sample.id, problem.name)
+    dir.create(problem.path, showWarnings = FALSE, recursive = TRUE)
+    tit <- paste(sample.id, problem.name)
+    chrom <- sub(":.*", "", problem.name)
+    viz <- 
+      list(profile=ggplot()+
+             ggtitle(tit)+
+             xlab(paste("position on",
+                        chrom,
+                        "(kilo bases = kb)"))+
+             guides(linetype=guide_legend(order=2,
+                      override.aes=list(fill="white")))+
+             scale_linetype_manual("error type", 
+                                   values=c(correct=0,
+                                     "false negative"=3,
+                                     "false positive"=1))+
+             geom_tallrect(aes(xmin=chromStart/1e3, xmax=chromEnd/1e3,
+                               showSelected=peaks,
+                               linetype=status,
+                               fill=annotation),
+                           alpha=0.5,
+                           data=show.errors)+
+             scale_fill_manual(values=ann.colors)+
+             geom_line(aes(chromStart/1e3, count),
+                       data=bins)+
+             facet_grid(chunk.id ~ ., labeller=function(var, val){
+               paste("chunk", val)
+             })+
+             theme_animint(width=1500),
+
+           title=tit,
+
+           first=list(peaks=show.param.list[[1]]),
+
+           selection=ggplot()+
+             geom_segment(aes(min.log.lambda, weighted.error,
+                              xend=max.log.lambda, yend=weighted.error),
+                          data=show.exact)+
+             scale_y_continuous(limits=c(0, NA))+
+             facet_grid(chunk.id ~ ., labeller=function(var, val){
+               paste("chunk", val)
+             })+
+             xlab("penalty log(lambda)")+
+             geom_tallrect(aes(xmin=min.log.lambda, xmax=max.log.lambda,
+                               clickSelects=peaks),
+                           alpha=0.5,
+                           data=show.exact))
+
+    png.path <- paste0(problem.path, ".png")
+    png(png.path, units="in", res=100, width=8, height=4)
+    print(viz$profile)
+    dev.off()
+    
+    thumb.path <- sub("[.]png", "-thumb.png", png.path)
+    cmd <- sprintf("convert %s -resize 230 %s", png.path, thumb.path)
+    system(cmd)
+    
+    if(is.data.frame(show.peaks) && nrow(show.peaks)){
+      viz$profile <- viz$profile+
+        geom_segment(aes(chromStart/1e3, 0,
+                         showSelected=peaks,
+                         xend=chromEnd/1e3, yend=0),
+                     data=show.peaks,
+                     size=4,
+                     color="deepskyblue")+
+        geom_point(aes(chromStart/1e3, 0,
+                       showSelected=peaks),
+                   data=show.peaks,
+                   size=5,
+                   color="deepskyblue")
+    }
+    animint2dir(viz, out.dir=problem.path)
+  }#problem.name
+}#sample.id
+
 errors.by.res <- split(errors, errors$bases.per.bin)
 errors.best.res <- errors.by.res[[bases.per.bin.str]]
 errors.ordered <- errors.best.res[order(weighted.error, decreasing = TRUE), ]
-errors.ordered[, sample.path := sub("_residuals[.]RData$", "",
-                               RData.files[sample.id])]
-errors.ordered[, relative.path := sub(paste0(no.trailing, "/"),
-                                 "", sample.path)]
-errors.ordered[, problem.base := file.path(relative.path,
-                                bases.per.bin, chrom, problem.name)]
-errors.ordered[, thumb.png := paste0(problem.base, "-thumb.png")]
-errors.ordered[, index := file.path(problem.base, "index.html")]
+errors.ordered[, sample.dir := sample.id]
+errors.ordered[, problem.dir := file.path(sample.dir, problem.name)]
+errors.ordered[, thumb.png := paste0(problem.dir, "-thumb.png")]
+errors.ordered[, index := file.path(problem.dir, "index.html")]
 errors.ordered[, thumb.href := sprintf('<a href="%s"><img src="%s" /></a>',
                               index, thumb.png)]
 errors.ordered[, chrom.fac := factor(chrom, paste0("chr", c(1:22, "X", "Y")))]
@@ -91,11 +196,6 @@ errors.ordered[, errors := ifelse(weighted.error == 0, "none", "some")]
 ##   href=index, color=errors), data=errors.ordered)+
 ##   scale_color_manual(values=c(none="grey", some="black"))+
 ##   facet_grid(sample.id ~ .)
-ann.colors <-
-  c(noPeaks="#f6f4bf",
-    peakStart="#ffafaf",
-    peakEnd="#ff4c4c",
-    peaks="#a445ee")
 rcopy <- data.table(regions)
 rcopy[, chrom.fac := factor(paste(chrom), paste0("chr", c(1:22, "X", "Y")))]
 tit <-
@@ -127,7 +227,7 @@ ggplot()+
              size=2,
              data=rcopy)
 chrom.base <- "figure-training-data-chroms.png"
-chrom.path <- file.path(no.trailing, chrom.base)
+chrom.path <- file.path(figures.path, chrom.base)
 png(chrom.path, units="in", res=100, width=10, height=8)
 print(chromPlot)
 dev.off()
@@ -140,7 +240,7 @@ xt.cols <-
 errors.df <- data.frame(errors.ordered)[, xt.cols]
 xt <- xtable(errors.df)
 
-report.file <- file.path(no.trailing, "learned.model.html")
+report.file <- file.path(figures.path, "index.html")
 cat(sprintf('<img src="%s" /> <br />', chrom.base),
     sprintf('<img src="%s" /> <br />', error.base),
     file=report.file)
