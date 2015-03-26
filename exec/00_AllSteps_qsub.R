@@ -80,24 +80,30 @@ qsub.id <- sub("[.].*", "", qsub.out)
 cat("started job ", qsub.id, "\n", sep="")
 
 ## Step3: genome-wide peak prediction.
+Step3 <-
+  system.file(file.path("exec", "Step3-predict-peaks.R"),
+              package="PeakSegDP")
 bedGraph.files <- Sys.glob(file.path(data.dir, "*", "*.bedGraph"))
 RData.file <- file.path(data.dir, "learned.model.RData")
+peak.qsub.id.list <- list()
 for(bedGraph.file in bedGraph.files){
+  peaks.base <- sub("[.]bedGraph$", "_peaks", bedGraph.file)
   script.txt <-
     paste0("#!/bin/bash
 #PBS -l nodes=1:ppn=4
 #PBS -l walltime=12:00:00                      
 #PBS -A bws-221-ae
 #PBS -W depend=afterok:", qsub.id, "
-#PBS -o ", learned.base, ".out
-#PBS -e ", learned.base, ".err
+#PBS -o ", peaks.base, ".out
+#PBS -e ", peaks.base, ".err
 #PBS -V                                        
-#PBS -N learned.model
-", Rscript, " ", Step2, " ", data.dir)
-  script.file <- paste0(learned.base, ".sh")
+#PBS -N ", basename(peaks.base), "
+", Rscript, " ", Step3, " ", RData.file, " ", bedGraph.file)
+  script.file <- paste0(peaks.base, ".sh")
   cat(script.txt, file=script.file)
   cmd <- paste("qsub", script.file)
   qsub.out <- system(cmd, intern=TRUE)
   qsub.id <- sub("[.].*", "", qsub.out)
   cat("started job ", qsub.id, "\n", sep="")
+  peak.qsub.id.list[[script.file]] <- qsub.id
 }
