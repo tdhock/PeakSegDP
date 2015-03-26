@@ -246,31 +246,26 @@ smooth.interval.regression <- function
               mu=mu,sigma=sigma)
   sol$scaled <- scaled
   sol$log.limits <- some.limits
-  ## this function will be applied to new data before applying the
-  ## model.
-  sol$normalize <- function(X){
-    not.present <- !colnames(scaled) %in% colnames(X)
-    if(any(not.present)){
-      print(colnames(scaled)[not.present])
-      stop("need all training features to predict")
-    }
-    X <- X[,colnames(scaled),drop=FALSE]
-    mu.mat <- matrix(mu,nrow(X),ncol(X),byrow=TRUE)
-    s.mat <- matrix(sigma,nrow(X),ncol(X),byrow=TRUE)
-    (X-mu.mat)/s.mat
-  }
-  sol$f <- function(x){
-    stopifnot(is.vector(x))
-    stopifnot(length(x)==p)
-    sum(x*sol$weights)+sol$intercept
-  }
+  sol$nonzero.weights <- with(sol, weights[weights != 0])
+  sol$nonzero.names <- names(sol$nonzero.weights)
+  sol$nonzero.mu <- sol$mu[sol$nonzero.names]
+  sol$nonzero.sigma <- sol$sigma[sol$nonzero.names]
+  ## Predict log.lambda penalty values.
   sol$predict <- function(X){
     stopifnot(is.matrix(X))
-    X.norm <- sol$normalize(X)
-    L.hat <- (X.norm %*% sol$weights) + sol$intercept
-    L.hat
+    not.present <- ! sol$nonzero.names %in% colnames(X)
+    if(any(not.present)){
+      print(sol$nonzero.names[not.present])
+      stop("missing some features with nonzero weights")
+    }
+    X.nonzero <- X[, sol$nonzero.names, drop=FALSE]
+    mu.mat <-
+      matrix(sol$nonzero.mu, nrow(X.nonzero), ncol(X.nonzero), byrow=TRUE)
+    s.mat <-
+      matrix(sol$nonzero.sigma, nrow(X.nonzero), ncol(X.nonzero), byrow=TRUE)
+    X.norm <- (X.nonzero - mu.mat)/s.mat
+    (X.norm %*% sol$nonzero.weights) + sol$intercept
   }
-  sol$train.f <- apply(scaled,1,sol$f)
   sol$train.predict <- sol$predict(features)
   sol
 ### List of solver results. For a feature matrix X with p columns, you
@@ -367,22 +362,21 @@ regularized.interval.regression <- function
               scaled=scaled,
               log.limits=some.limits,
               gamma.seq=gamma.seq)
-  ## this function will be applied to new data before applying the
-  ## model.
-  sol$normalize <- function(X){
-    not.present <- !colnames(scaled) %in% colnames(X)
-    if(any(not.present)){
-      print(colnames(scaled)[not.present])
-      stop("need all training features to predict")
-    }
-    X <- X[,colnames(scaled)]
-    mu.mat <- matrix(mu,nrow(X),ncol(X),byrow=TRUE)
-    s.mat <- matrix(sigma,nrow(X),ncol(X),byrow=TRUE)
-    (X-mu.mat)/s.mat
-  }
+  ## Predict the log.lambda penalty values for a feature matrix X
+  ## (rows=segmentation problems, columns=features).
   sol$predict <- function(X){
     stopifnot(is.matrix(X))
-    X.norm <- sol$normalize(X)
+    not.present <- ! colnames(scaled) %in% colnames(X)
+    if(any(not.present)){
+      print(colnames(scaled)[not.present])
+      stop("missing some features with nonzero weights")
+    }
+    X <- X[, colnames(scaled), drop=FALSE]
+    mu.mat <-
+      matrix(sol$mu, nrow(X), ncol(X), byrow=TRUE)
+    s.mat <-
+      matrix(sol$sigma, nrow(X), ncol(X), byrow=TRUE)
+    X.norm <- (X-mu.mat)/s.mat
     cbind(1,X.norm) %*% sol$coefs
   }
   sol$train.predict <- sol$predict(features)

@@ -328,7 +328,7 @@ for(validation.fold in folds){
       too.hi <- eval.data$limits[,2] < pred.penalty
       is.error <- too.lo | too.hi
       errors <- sum(is.error)
-      ## TODO: compute real annotation error.
+      ## TODO: compute real annotation error?
       gamma <- fit$gamma.seq[[complexity.i]]
       possible.errors <- length(is.error)
       percent.error <- errors/possible.errors

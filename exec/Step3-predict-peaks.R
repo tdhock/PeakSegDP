@@ -3,7 +3,7 @@ library(PeakSegDP)
 
 exData <- system.file("exampleData", package="PeakSegDP")
 argv <-
-  file.path(exData, c("learned.model.RData", "bcell/McGill0322.bedGraph"))
+  file.path(exData, c("learned.model.RData", "bcell/McGill0091.bedGraph"))
 
 argv <- commandArgs(trailingOnly=TRUE)
 
