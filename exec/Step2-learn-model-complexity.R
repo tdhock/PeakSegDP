@@ -171,7 +171,7 @@ for(sample.id in names(features.limits.list)){
                    size=5,
                    color="deepskyblue")
     }
-    animint2dir(viz, out.dir=problem.path)
+    animint2dir(viz, out.dir=problem.path, open.browser=FALSE)
   }#problem.name
 }#sample.id
 
@@ -234,8 +234,8 @@ dev.off()
 
 
 xt.cols <-
-  c("thumb.href", "problem.name",
-    "weighted.error", "total.weight",
+  c("weighted.error", "total.weight",
+    "thumb.href", "sample.id", "problem.name",
     "min.peaks", "max.peaks")
 errors.df <- data.frame(errors.ordered)[, xt.cols]
 xt <- xtable(errors.df)
