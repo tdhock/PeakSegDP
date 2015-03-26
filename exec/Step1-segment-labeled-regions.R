@@ -44,6 +44,10 @@ argv <- commandArgs(trailingOnly=TRUE)
 
 print(argv)
 
+if(length(argv) != 2){
+  stop("usage: Rscript Step1.R profile.bedGraph labels.bed")
+}
+
 bedGraph.path <- normalizePath(argv[1], mustWork=TRUE)
 bed.path <- normalizePath(argv[2], mustWork=TRUE)
 
@@ -75,8 +79,6 @@ setkey(sample.coverage, chrom, chromStart, chromEnd)
 
 base.dir <- sub("[.][a-zA-Z]*$", "", bedGraph.path)
 
-sample.quartile <- quantile(sample.coverage$count)
-
 features.list <- list()
 bin.list <- list()
 modelSelection.list <- list() # for computing test error.
@@ -89,7 +91,6 @@ all.problem.list <- list()# for deterimining where to keep peaks.
 for(chrom in names(regions.by.chrom)){
   chrom.regions <- regions.by.chrom[[chrom]]
   chrom.coverage <- sample.coverage[chrom]
-  chrom.quartile <- quantile(chrom.coverage$count)
   chrom.bases <- max(chrom.coverage$chromEnd)
   for(problem.size.i in 1:nrow(feasible.resolutions)){
     res.row <- feasible.resolutions[problem.size.i, ]
@@ -137,68 +138,26 @@ for(chrom in names(regions.by.chrom)){
         load(RData.path)
       }else{
         cat(RData.path, "\n")
-        binSum.seconds <- system.time({
-          bins <- 
-            binSum(chrom.coverage,
-                   bin.chromStart=problem.regions$chromStart[1],
-                   bin.size=bases.per.bin)
-        })[["elapsed"]]
 
-        cDPA.seconds <- system.time({
-          fit <- PeakSegDP(bins, maxPeaks = 9L)
-        })[["elapsed"]]
-
-        ## Compute feature vector for learning using this segmentation
-        ## problem.
-        bases <- with(bins, chromEnd-chromStart)
-        long <- rep(bins$count, bases)
-        n.bases <- sum(bases)
-        n.data <- nrow(bins)
-
-        uq <- quantile(bins$count)
-        feature.vec <-
-          c(unweighted.quartile=uq,
-            weighted.quartile=quantile(long),
-            sample.quantile.ratio=uq/sample.quartile,
-            chrom.quantile.ratio=uq/chrom.quartile,
-            sample.quantile=sample.quartile,
-            chrom.quantile=chrom.quartile,
-            unweighted.mean=mean(bins$count),
-            weighted.mean=mean(long),
-            bases=n.bases,
-            data=n.data)
-        suppressWarnings({
-          features <-
-            c(feature.vec,
-              `log+1`=log(feature.vec+1),
-              log=log(feature.vec),
-              log.log=log(log(feature.vec)))
-        })
-
-        save(fit, features, bins,
-             binSum.seconds, cDPA.seconds,
-             file=RData.path)
+        seg.info <-
+          segmentBins(chrom.coverage,
+                      problem.regions$chromStart[1],                      
+                      bases.per.bin,
+                      bins.per.problem)
+        
+        save(seg.info, file=RData.path)
       }#if(file.exists(RData.path))/else
 
-      features.list[[paste(bases.per.bin)]][[problem.name]] <- features
-      bin.list[[paste(bases.per.bin)]][[problem.name]] <- bins
-
-      all.loss <- data.frame(fit$error)
-      all.loss$cummin <- cummin(all.loss$error)
-      loss <- subset(all.loss, error == cummin)
-      rownames(loss) <- loss$segments
-      bases <- with(fit$segments[1,], chromEnd-chromStart)
-      in.sqrt <- 1.1 + log(bases / loss$segments)
-      in.square <- 1 + 4 * sqrt(in.sqrt)
-      complexity <- in.square * in.square * loss$segments
-      
-      exact <- with(loss, exactModelSelection(error, complexity, peaks))
+      features.list[[paste(bases.per.bin)]][[problem.name]] <- seg.info$features
+      bin.list[[paste(bases.per.bin)]][[problem.name]] <- seg.info$bins
 
       ## To map a predicted penalty value back to peaks, we need to
       ## store the exact model selection function and the list of
       ## peaks.
+      exact <- seg.info$modelSelection
       modelSelection.list[[paste(bases.per.bin)]][[problem.name]] <- exact
-      peaks.list[[paste(bases.per.bin)]][[problem.name]] <- fit$peaks
+      peaks.list[[paste(bases.per.bin)]][[problem.name]] <-
+        seg.info$fit$peaks
       
       exact$weighted.error <- NA
       rownames(exact) <- exact$peaks
@@ -212,7 +171,7 @@ for(chrom in names(regions.by.chrom)){
       for(chunk.id in names(chunk.list)){
         chunk.regions <- chunk.list[[chunk.id]]
         for(param.name in rownames(exact)){
-          param.peaks <- fit$peaks[[param.name]]
+          param.peaks <- seg.info$fit$peaks[[param.name]]
           error <- PeakErrorChrom(param.peaks, chunk.regions)
           error$weight <- chunk.regions$weight
           error$weighted.error <- with(error, weight * (fp+fn))
@@ -244,8 +203,8 @@ for(chrom in names(regions.by.chrom)){
                      chunk.id,
                      bases.per.bin,
                      bases.per.problem,
-                     binSum.seconds,
-                     cDPA.seconds,
+                     binSum.seconds=seg.info$binSum.seconds,
+                     cDPA.seconds=seg.info$cDPA.seconds,
                      min.peaks=exact$peaks[limits$end],
                      max.peaks=exact$peaks[limits$start],
                      weighted.error=min(exact$weighted.error),

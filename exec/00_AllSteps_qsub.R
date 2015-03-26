@@ -80,3 +80,24 @@ qsub.id <- sub("[.].*", "", qsub.out)
 cat("started job ", qsub.id, "\n", sep="")
 
 ## Step3: genome-wide peak prediction.
+bedGraph.files <- Sys.glob(file.path(data.dir, "*", "*.bedGraph"))
+RData.file <- file.path(data.dir, "learned.model.RData")
+for(bedGraph.file in bedGraph.files){
+  script.txt <-
+    paste0("#!/bin/bash
+#PBS -l nodes=1:ppn=4
+#PBS -l walltime=12:00:00                      
+#PBS -A bws-221-ae
+#PBS -W depend=afterok:", qsub.id, "
+#PBS -o ", learned.base, ".out
+#PBS -e ", learned.base, ".err
+#PBS -V                                        
+#PBS -N learned.model
+", Rscript, " ", Step2, " ", data.dir)
+  script.file <- paste0(learned.base, ".sh")
+  cat(script.txt, file=script.file)
+  cmd <- paste("qsub", script.file)
+  qsub.out <- system(cmd, intern=TRUE)
+  qsub.id <- sub("[.].*", "", qsub.out)
+  cat("started job ", qsub.id, "\n", sep="")
+}
