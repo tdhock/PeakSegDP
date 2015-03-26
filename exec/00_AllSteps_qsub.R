@@ -51,7 +51,7 @@ for(labels.file in labels.files){
   cmd <- paste("qsub", script.file)
   qsub.out <- system(cmd, intern=TRUE)
   residual.qsub.id <- sub("[.].*", "", qsub.out)
-  cat("started job ", residual.qsub.id, "\n", sep="")
+  cat("submitted job ", residual.qsub.id, "\n", sep="")
   residual.qsub.id.list[[script.file]] <- residual.qsub.id
 }
 
@@ -77,7 +77,7 @@ cat(script.txt, file=script.file)
 cmd <- paste("qsub", script.file)
 qsub.out <- system(cmd, intern=TRUE)
 learned.qsub.id <- sub("[.].*", "", qsub.out)
-cat("started job ", learned.qsub.id, "\n", sep="")
+cat("submitted job ", learned.qsub.id, "\n", sep="")
 
 ## Step3: genome-wide peak prediction.
 Step3 <-
@@ -104,9 +104,31 @@ for(bedGraph.file in bedGraph.files){
   cmd <- paste("qsub", script.file)
   qsub.out <- system(cmd, intern=TRUE)
   peak.qsub.id <- sub("[.].*", "", qsub.out)
-  cat("started job ", peak.qsub.id, "\n", sep="")
+  cat("submitted job ", peak.qsub.id, "\n", sep="")
   peak.qsub.id.list[[script.file]] <- peak.qsub.id
 }
 
 ## Step4: model visualization and peak clustering.
+Step4 <-
+  system.file(file.path("exec", "Step4-cluster-peaks.R"),
+              package="PeakSegDP")
+peak.qsub.id.txt <- paste(peak.qsub.id.list, collapse=":")
+predicted.base <- file.path(data.dir, "predicted-figures")
+script.txt <-
+  paste0("#!/bin/bash
+#PBS -l nodes=1:ppn=4
+#PBS -l walltime=12:00:00                      
+#PBS -A bws-221-ae
+#PBS -W depend=afterok:", peak.qsub.id.txt, "
+#PBS -o ", predicted.base, ".out
+#PBS -e ", predicted.base, ".err
+#PBS -V                                        
+#PBS -N predicted-figures
+", Rscript, " ", Step4, " ", data.dir)
+script.file <- paste0(predicted.base, ".sh")
+cat(script.txt, file=script.file)
+cmd <- paste("qsub", script.file)
+qsub.out <- system(cmd, intern=TRUE)
+cluster.qsub.id <- sub("[.].*", "", qsub.out)
+cat("submitted job ", cluster.qsub.id, "\n", sep="")
 

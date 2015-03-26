@@ -15,12 +15,6 @@ where there are path/to/celltype/*.bedGraph files")
 
 labels.file <- argv[1]
 
-ann.colors <-
-  c(noPeaks="#f6f4bf",
-    peakStart="#ffafaf",
-    peakEnd="#ff4c4c",
-    peaks="#a445ee")
-
 g.pos.pattern <-
   paste0("(?<chrom>chr.+?)",
          ":",

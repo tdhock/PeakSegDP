@@ -266,11 +266,37 @@ for(bases.per.bin.str in names(features.list)){
          peaks=peaks.list[[bases.per.bin.str]])#list[problem]
 }
 
+## Finally, we will want to display model predictions for each chunk
+## in Step4, so save some data in those regions for display later.
+region.list <- split(regions, regions$chunk.id)
+chunk.info <- list()
+chunk.dt.list <- list()
+for(chunk.id in names(region.list)){
+  chunk.regions <- region.list[[chunk.id]]
+  chrom <- paste(chunk.regions$chrom[1])
+  chrom.coverage <- sample.coverage[chrom]
+  chunkStart <- min(chunk.regions$chromStart)
+  chunkEnd <- max(chunk.regions$chromEnd)
+  chunk.bases <- chunkEnd-chunkStart
+  n.bins <- 2000L
+  bases.per.bin <- as.integer(chunk.bases/n.bins)
+  bins <- binSum(chrom.coverage, chunkStart, bases.per.bin, n.bins)
+  chunk <- data.table(chunk.id, chrom, chunkStart, chunkEnd)
+  chunk.dt.list[[chunk.id]] <- chunk
+  chunk.info[[chunk.id]] <-
+    list(regions=chunk.regions,
+         bins=data.table(bins),
+         chunk=chunk)
+}
+chunk.dt <- do.call(rbind, chunk.dt.list)
+
 out.RData <- sub("labels[.]bed$", "residuals.RData", bed.path)
 save(features.limits, # used for the learning/training.
      ## (limits separated by chunk for cross-validation).
      errors, # used for selecting the best resolution before training.
      regions,
+     chunk.dt,
+     chunk.info, # used for model visualization.
      ## For this model we will need to compute per-chromosome errors, for
      ## several different test sets of chunk ids. So save regions so we can
      ## compute test error later.
