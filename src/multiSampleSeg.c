@@ -138,7 +138,10 @@ multiSampleSegHeuristic(
   while(bases/bases_per_bin/bin_factor >= 4){
     bases_per_bin *= bin_factor;
   }
-  int n_bins = bases / bases_per_bin + 1;
+  int n_bins = bases / bases_per_bin;
+  if(bases % bases_per_bin != 0){
+    n_bins ++ ;
+  }
   
   //printf("n_bins=%d bases_per_bin=%d\n", n_bins, bases_per_bin);
 
@@ -155,7 +158,8 @@ multiSampleSegHeuristic(
 		    bases_per_bin, n_bins, max_chromStart, 
 		    ERROR_EMPTY_BIN);
     if(status != 0){
-      //printf("first sample_i=%d\n", sample_i);
+      /* printf("first sample_i=%d bases_per_bin=%d n_bins=%d\n",  */
+      /* 	     sample_i, bases_per_bin, n_bins); */
       return status;
     }
   }//for sample_i
