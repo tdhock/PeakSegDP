@@ -79,6 +79,10 @@ int binSum
       bin_end += bin_size;
     }
   }
+  // If EMPTY_AS_ZERO flag, return now (untouched totals are zero).
+  if(status_for_empty_bin == EMPTY_AS_ZERO){
+    return 0;
+  }
   // If there was no data at all that overlapped a bin (not even
   // zeros), then set it to -1 to mark that.
   int status = 0;

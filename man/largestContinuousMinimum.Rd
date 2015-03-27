@@ -22,7 +22,7 @@ data(chr11ChIPseq)
 one <- subset(chr11ChIPseq$coverage, sample.id=="McGill0322")
 fit <- PeakSegDP(one, 5L)
 ## First compute the optimal number of peaks function.
-exact.df <- with(fit$error, exactModelSelection(error, peaks))
+exact.df <- with(fit$error, exactModelSelection(error, segments, peaks))
 ## Then compute the PeakError of these models with respect to the
 ## annotated regions.
 regions <- subset(chr11ChIPseq$regions, sample.id=="McGill0322")

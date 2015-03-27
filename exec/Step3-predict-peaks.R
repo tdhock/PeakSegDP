@@ -12,7 +12,7 @@ if(length(argv) != 2){
 }
 
 RData.path <- normalizePath(argv[1], mustWork=TRUE)
-bedGraph.path <- normalizePath(argv[2], mustWork=TRUE)
+bedGraph.path <- normalizeDir(argv[2])
 base.dir <- sub("[.][a-zA-Z]*$", "", bedGraph.path)
 
 cat("Reading learned model ", RData.path, "\n", sep="")

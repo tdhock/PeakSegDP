@@ -6,10 +6,12 @@ and a model selection function i*(lambda) = argmin_i C_i +
 lambda*K_i, compute a set of consecutive (K_i, min.lambda,
 max.lambda) with i being the solution for every lambda in
 (min.lambda, max.lambda).}
-\usage{exactModelSelection(cost, model.complexity)}
+\usage{exactModelSelection(cost, model.complexity, peaks)}
 \arguments{
   \item{cost}{numeric vector: optimal costs C_i.}
   \item{model.complexity}{numeric vector: model complexity K_i.}
+  \item{peaks}{
+}
 }
 
 
@@ -42,8 +44,8 @@ ggplot()+
 ## Calculate the exact path of breakpoints in the optimal number of
 ## peaks function.
 rownames(fit$error) <- fit$error$peaks
-exact.df <- with(fit$error, exactModelSelection(error, peaks))
-intercept <- fit$error[as.character(exact.df$model.complexity), "error"]
+exact.df <- with(fit$error, exactModelSelection(error, segments, peaks))
+intercept <- fit$error[as.character(exact.df$peaks), "error"]
 exact.df$cost <- intercept + exact.df$min.lambda * exact.df$model.complexity
 exact.df$next.cost <- c(exact.df$cost[-1], NA)
 ggplot()+
@@ -53,13 +55,13 @@ ggplot()+
                    xend=max.lambda, yend=next.cost),
                data=exact.df, color="red", size=1.5)+
   geom_text(aes((min.lambda+max.lambda)/2, (cost+next.cost)/2,
-                label=sprintf("\%d peak\%s optimal", model.complexity,
-                  ifelse(model.complexity==1, "", "s"))),
+                label=sprintf("\%d peak\%s optimal", peaks,
+                  ifelse(peaks==1, "", "s"))),
             data=exact.df, color="red", hjust=0, vjust=1.5)+
-  geom_abline(aes(slope=peaks, intercept=error), data=fit$error)+
+  geom_abline(aes(slope=segments, intercept=error), data=fit$error)+
   geom_text(aes(0, error, label=peaks),
             data=fit$error, hjust=1.5, color="red")+
-  ggtitle("model selection: cost = loss_k + lambda*peaks_k")
+  ggtitle("model selection: cost = loss_k + lambda*segments_k")
 ## Solve the optimization using grid search.
 L.grid <- with(exact.df,{
   seq(min(max.log.lambda)-1,
@@ -68,15 +70,15 @@ L.grid <- with(exact.df,{
 })
 lambda.grid <- exp(L.grid)
 kstar.grid <- sapply(lambda.grid,function(lambda){
-  crit <- fit$error$peaks * lambda + fit$error$error
+  crit <- fit$error$segments * lambda + fit$error$error
   picked <- which.min(crit)
   fit$error$peaks[picked]
 })
 grid.df <- data.frame(log.lambda=L.grid, peaks=kstar.grid)
 ## Compare the results.
 ggplot()+
-  geom_segment(aes(min.log.lambda, model.complexity,
-                   xend=max.log.lambda, yend=model.complexity),
+  geom_segment(aes(min.log.lambda, peaks,
+                   xend=max.log.lambda, yend=peaks),
                data=exact.df)+
   geom_point(aes(log.lambda, peaks),
              data=grid.df, color="red", pch=1)+

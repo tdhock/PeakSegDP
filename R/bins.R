@@ -7,8 +7,12 @@ binSum <- structure(function
 ### Base before first bin.
  bin.size=1L,
 ### Bin size.
- n.bins=2000L
+ n.bins=2000L,
 ### Number of bins.
+ empty.as.zero=FALSE
+### Sometimes the last few bins do not have any overlapping data in
+### compressed. If TRUE, set these counts to 0. If FALSE, ignore these
+### bins (returning a data.frame with fewer than n.bins rows).
  ){
   stopifnot(is.integer(compressed$chromStart))
   stopifnot(is.integer(compressed$chromEnd))
@@ -32,6 +36,9 @@ binSum <- structure(function
      bin.chromStart=as.integer(bin.chromStart),
      package="PeakSegDP")
   total <- result$bin.total
+  if(empty.as.zero){
+    total[total == -1] <- 0L
+  }
   chromStart <- seq(bin.chromStart, by=bin.size, l=n.bins)
   chromEnd <- chromStart + bin.size
   data.frame(chromStart, chromEnd, count=total,

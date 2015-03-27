@@ -48,8 +48,8 @@ if(length(argv) != 2){
   stop("usage: Rscript Step1.R profile.bedGraph labels.bed")
 }
 
-bedGraph.path <- normalizePath(argv[1], mustWork=TRUE)
-bed.path <- normalizePath(argv[2], mustWork=TRUE)
+bedGraph.path <- normalizeDir(argv[1])
+bed.path <- normalizeDir(argv[2])
 
 regions.wide <- fread(bed.path)
 region.names <- c("chrom", "chromStart", "chromEnd", "annotation", "chunk.id")

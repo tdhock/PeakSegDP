@@ -139,20 +139,33 @@ multiSampleSegHeuristic <- structure(function
     param.name <- paste(param)
     param.int <- as.integer(param)
     m.args[[param.name]] <- substitute({
+      print(PINT)
       peak <- multiSampleSegHeuristic(many, PINT)
       diff.bases <- sum(abs(peak - optimal))
       results[[paste(PINT)]] <- data.frame(param=PINT, peak, diff.bases)
     }, list(PINT=param.int))
   }
   times <- microbenchmark(list=m.args, times=3)
-  (results.df <- do.call(rbind, results))
+  results.df <- do.call(rbind, results)
+  optimal.timing <- 
+    data.frame(seconds=optimal.seconds, what="seconds")
   ggplot()+
+    ggtitle(paste("heuristic segmentation accurate within 10 bases",
+                  "and much faster than optimal segmentation",
+                  sep="\n"))+
     scale_x_log10()+
     scale_y_log10()+
     geom_point(aes(as.numeric(as.character(param)), diff.bases),
                data=data.frame(results.df, what="diff.bases"),
                pch=1)+
     facet_grid(what ~ ., scales="free")+
+    geom_hline(aes(yintercept=seconds), data=optimal.timing)+
+    geom_text(aes(10, seconds,
+                  label=sprintf("optimal segmentation = %.1f seconds",
+                    seconds)),
+              hjust=0,
+              vjust=1.5,
+              data=optimal.timing)+
     geom_point(aes(as.numeric(as.character(expr)), time/1e9),
                data=data.frame(times, what="seconds"), pch=1)
 
@@ -171,50 +184,26 @@ multiSampleSegHeuristic <- structure(function
     theme(panel.margin=grid::unit(0, "cm"))+
     facet_grid(sample.id ~ ., scales="free")
 
-  ## This data set caused a problem in peakStart.
-  library(PeakSegDP)
-  data(H3K36me3.TDH.other.chunk3.cluster4)
-  many <- H3K36me3.TDH.other.chunk3.cluster4
-  heuristic.seconds <- system.time({
-    heuristic <- multiSampleSegHeuristic(many)
-  })[["elapsed"]]
-  min.chromStart <- min(many$chromStart)
-  max.chromEnd <- max(many$chromEnd)
-  ggplot()+
-    geom_step(aes(chromStart/1e3, count), data=many)+
-    geom_segment(aes(chromStart/1e3, 0,
-                     xend=chromEnd/1e3, yend=0),
-                 data=heuristic,
-                 color="green",
-                 size=1)+
-    theme_bw()+
-    coord_cartesian(xlim=c(min.chromStart, max.chromEnd)/1e3)+
-    theme(panel.margin=grid::unit(0, "cm"))+
-    facet_grid(sample.id ~ ., scales="free")
-
   ## Heuristic in R code for debugging.
   profiles <- many
-  optimal.seconds <- system.time({
-    optimal <- multiSampleSegOptimal(profiles)
-  })[["elapsed"]]
-  two.list <- split(profiles, profiles$sample.id, drop=TRUE)
-  max.chromStart <- max(sapply(two.list, with, chromStart[1]))
-  min.chromEnd <- min(sapply(two.list, with, chromEnd[length(chromEnd)]))
+  profile.list <- split(profiles, profiles$sample.id, drop=TRUE)
+  max.chromStart <- max(sapply(profile.list, with, chromStart[1]))
+  min.chromEnd <- min(sapply(profile.list, with, chromEnd[length(chromEnd)]))
   c(max.chromStart, min.chromEnd)
   bases <- min.chromEnd-max.chromStart
-  n.samples <- length(two.list)
+  n.samples <- length(profile.list)
   small.chromEnd <- (max.chromStart+1):min.chromEnd
   small.bins <-
     matrix(NA, bases, n.samples,
            dimnames=list(position=small.chromEnd,
-             sample.id=names(two.list)))
-  for(sample.id in names(two.list)){
-    one <- two.list[[sample.id]]
+             sample.id=names(profile.list)))
+  for(sample.id in names(profile.list)){
+    one <- profile.list[[sample.id]]
     bins <- binSum(one, max.chromStart, n.bins=bases)
     stopifnot(bins$chromEnd == small.chromEnd)
     small.bins[, sample.id] <- bins$count
   }
-  bin.factor <- 2L
+  bin.factor <- 10L
   bases.per.bin <- 1L
   while(bases/bases.per.bin/bin.factor >= 4){
     bases.per.bin <- bases.per.bin * bin.factor
@@ -222,25 +211,22 @@ multiSampleSegHeuristic <- structure(function
   n.bins <- as.integer(bases %/% bases.per.bin + 1L)
   na.mat <- 
     matrix(NA, n.bins, n.samples,
-           dimnames=list(bin=NULL, sample.id=names(two.list)))
+           dimnames=list(bin=NULL, sample.id=names(profile.list)))
   first.cumsums <- list(count=na.mat)
   bin.list <- list()
   norm.list <- list()
-  for(sample.i in seq_along(two.list)){
-    sample.id <- names(two.list)[sample.i]
-    one <- two.list[[sample.i]]
+  for(sample.i in seq_along(profile.list)){
+    sample.id <- names(profile.list)[sample.i]
+    one <- profile.list[[sample.i]]
     max.count <- max(one$count)
     bins <- binSum(one, max.chromStart, bases.per.bin, n.bins)
     stopifnot(n.bins == nrow(bins))
-    extra <- binSum(one, min.chromEnd, bases.per.bin, 1L)
-    if(nrow(extra) == 1){
-      bins$count[nrow(bins)] <- bins$count[nrow(bins)]-extra$count
-    }
     bins[nrow(bins), "chromEnd"] <- min.chromEnd
     bins$mean <- with(bins, count/(chromEnd-chromStart))
     bins$mean.norm <- bins$mean/max.count
     bin.list[[sample.id]] <- data.frame(sample.id, rbind(bins, NA))
     bases.vec <- with(bins, chromEnd-chromStart)
+    stopifnot(bins$count >= 0)
     first.cumsums$count[, sample.i] <- cumsum(bins$count)
     one$count.norm <- one$count/max.count
     norm.list[[sample.i]] <- one
@@ -363,7 +349,7 @@ multiSampleSegHeuristic <- structure(function
       chromEnd.vec <- limits[-1]
       intervals <-
         paste0(chromStart.vec, "-", chromEnd.vec)
-      dn <- list(bin=c("before", intervals), sample.id=names(two.list))
+      dn <- list(bin=c("before", intervals), sample.id=names(profile.list))
       m <- matrix(NA, n.cumsum, n.samples, dimnames=dn)
       list(count=m, 
            chromStart=chromStart.vec, chromEnd=chromEnd.vec)
@@ -372,16 +358,15 @@ multiSampleSegHeuristic <- structure(function
       list(left=cumsum.list(left.chromStart),
            right=cumsum.list(right.chromStart))
 
-    for(sample.i in seq_along(two.list)){
-      one <- two.list[[sample.i]]
+    for(sample.i in seq_along(profile.list)){
+      one <- profile.list[[sample.i]]
       lr.list <-
         list(left=binSum(one, left.chromStart, bases.per.bin, n.bins.zoom),
-             right=binSum(one, right.chromStart, bases.per.bin, n.bins.zoom))
-      bin.past.data <- min.chromEnd < lr.list$right$chromEnd
-      if(any(bin.past.data))stop("Need to correct for extra counts")
-      lr.list$right$chromEnd[bin.past.data] <- min.chromEnd
+             right=binSum(one, right.chromStart, bases.per.bin, n.bins.zoom,
+                          empty.as.zero=TRUE))
       for(lr in names(lr.list)){
         lr.bins <- lr.list[[lr]]
+        stopifnot(nrow(lr.bins) == n.bins.zoom)
         lr.bases <- with(lr.bins, chromEnd-chromStart)
         lr.before <- before.cumsums[[lr]]
         lr.counts <- list(count=lr.bins$count)
@@ -421,7 +406,7 @@ multiSampleSegHeuristic <- structure(function
       seg1.loss <- OptimalPoissonLoss(seg1.means, seg1.cumsums)
       seg.list[[paste(model.i, 1)]] <-
         data.frame(chromStart=max.chromStart, chromEnd=seg1.chromEnd,
-                   mean=seg1.means, sample.id=names(two.list),
+                   mean=seg1.means, sample.id=names(profile.list),
                    model.i)
 
       seg1.mat <- small.bins[small.chromEnd <= seg1.chromEnd, ]
@@ -436,7 +421,7 @@ multiSampleSegHeuristic <- structure(function
       seg2.loss <- OptimalPoissonLoss(seg2.means, seg2.cumsums)
       seg.list[[paste(model.i, 2)]] <-
         data.frame(chromStart=seg1.chromEnd, chromEnd=seg2.chromEnd,
-                   mean=seg2.means, sample.id=names(two.list),
+                   mean=seg2.means, sample.id=names(profile.list),
                    model.i)
 
       is.seg2 <-
@@ -452,7 +437,7 @@ multiSampleSegHeuristic <- structure(function
       seg3.loss <- OptimalPoissonLoss(seg3.means, seg3.cumsums)
       seg.list[[paste(model.i, 3)]] <-
         data.frame(chromStart=seg2.chromEnd, chromEnd=last.chromEnd,
-                   mean=seg3.means, sample.id=names(two.list),
+                   mean=seg3.means, sample.id=names(profile.list),
                    model.i)
 
       is.seg3 <-
@@ -460,7 +445,7 @@ multiSampleSegHeuristic <- structure(function
           small.chromEnd <= last.chromEnd
       stopifnot(sum(is.seg3) == seg3.bases)
       seg3.mat <- small.bins[is.seg3, ]
-      stopifnot(all.equal(colMeans(seg3.mat), seg3.means))
+      ##stopifnot(all.equal(colMeans(seg3.mat), seg3.means))
 
       total.bases <- sum(seg1.bases + seg2.bases + seg3.bases)
       stopifnot(all.equal(total.bases, last.chromEnd - max.chromStart))
@@ -571,10 +556,30 @@ multiSampleSegHeuristic <- structure(function
     facet_grid(sample.id ~ ., labeller=function(var, val){
       sub("McGill0", "", val)
     })
-  ## png("figure-multiSampleSegHeuristic.png",
-  ##     units="in", res=200, width=8, height=20)
   print(searchPlot)
-  ##dev.off()
+  rbind(optimal=optimal,
+        heuristic=data.frame(chromStart=peakStart, chromEnd=peakEnd))
+
+  ## This data set caused a problem in peakStart.
+  library(PeakSegDP)
+  data(H3K36me3.TDH.other.chunk3.cluster4)
+  many <- H3K36me3.TDH.other.chunk3.cluster4
+  heuristic.seconds <- system.time({
+    heuristic <- multiSampleSegHeuristic(many, 10L)
+  })[["elapsed"]]
+  min.chromStart <- min(many$chromStart)
+  max.chromEnd <- max(many$chromEnd)
+  ggplot()+
+    geom_step(aes(chromStart/1e3, count), data=many)+
+    geom_segment(aes(chromStart/1e3, 0,
+                     xend=chromEnd/1e3, yend=0),
+                 data=heuristic,
+                 color="green",
+                 size=1)+
+    theme_bw()+
+    coord_cartesian(xlim=c(min.chromStart, max.chromEnd)/1e3)+
+    theme(panel.margin=grid::unit(0, "cm"))+
+    facet_grid(sample.id ~ ., scales="free")
 })
 
 multiSampleSegOptimal <- function

@@ -155,6 +155,7 @@ multiSampleSegHeuristic(
 		    bases_per_bin, n_bins, max_chromStart, 
 		    ERROR_EMPTY_BIN);
     if(status != 0){
+      //printf("first sample_i=%d\n", sample_i);
       return status;
     }
   }//for sample_i
@@ -298,6 +299,7 @@ multiSampleSegHeuristic(
 		      left_chromStart, 
 		      ERROR_EMPTY_BIN);
       if(status != 0){
+	//printf("bases/bin=%d left sample_i=%d\n", bases_per_bin_zoom, sample_i);
 	return status;
       }
       status = binSum(profile->chromStart, profile->chromEnd,
@@ -305,8 +307,9 @@ multiSampleSegHeuristic(
 		      right_count_mat + n_bins_zoom*sample_i,
 		      bases_per_bin_zoom, n_bins_zoom, 
 		      right_chromStart, 
-		      ERROR_EMPTY_BIN);
+		      EMPTY_AS_ZERO);
       if(status != 0){
+	//printf("bases/bin=%d right sample_i=%d\n", bases_per_bin_zoom, sample_i);
 	return status;
       }
       left_cumsum_value = left_cumsum_vec[sample_i];

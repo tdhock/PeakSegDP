@@ -18,6 +18,7 @@ single data.frame with additional column sample.id.}
 
 \examples{
 library(PeakSegDP)
+
 data(chr11ChIPseq)
 two <- subset(chr11ChIPseq$coverage,
               118090000 < chromStart &
@@ -71,22 +72,6 @@ ggplot()+
   theme(panel.margin=grid::unit(0, "cm"))+
   facet_grid(sample.id ~ ., scales="free")
 
-## plot microbenchmark time versus parameter.
-library(microbenchmark)
-m.args <- list()
-results <- list()
-for(param in paste(c(2, 3, 5, 10, 15, 20, 25, 30, 100, 1000))){
-  m.args[[param]] <- x <- quote({
-    results[[param]] <- multiSampleSegHeuristic(four, 2)
-  })
-  eval(x)
-}
-times <- microbenchmark(list=m.args)
-ggplot()+
-  scale_x_log10()+
-  geom_point(aes(as.numeric(as.character(expr)), time/1e9),
-             data=times, pch=1)
-
 ## A fake data set with two profiles with very different scales for
 ## the count variable, showing that the profile with the small
 ## counts will be basically ignored when computing the optimal
@@ -126,131 +111,271 @@ ggplot()+
   theme(panel.margin=grid::unit(0, "cm"))+
   facet_grid(sample.id ~ ., scales="free")
 
+## plot microbenchmark time versus parameter.
+data(H3K4me3.TDH.immune.chunk12.cluster4)
+many <- H3K4me3.TDH.immune.chunk12.cluster4
+optimal.seconds <- system.time({
+  optimal <- multiSampleSegOptimal(many)
+})[["elapsed"]]
+library(microbenchmark)
+m.args <- list()
+results <- list()
+param.values <-
+  c(2, 3, 5, 10, 15, 20, 25, 30, 50, 75, 100, 125, 150,
+    200, 300, 400, 500, 600)
+for(param in param.values){
+  param.name <- paste(param)
+  param.int <- as.integer(param)
+  m.args[[param.name]] <- substitute({
+    print(PINT)
+    peak <- multiSampleSegHeuristic(many, PINT)
+    diff.bases <- sum(abs(peak - optimal))
+    results[[paste(PINT)]] <- data.frame(param=PINT, peak, diff.bases)
+  }, list(PINT=param.int))
+}
+times <- microbenchmark(list=m.args, times=3)
+results.df <- do.call(rbind, results)
+optimal.timing <- 
+  data.frame(seconds=optimal.seconds, what="seconds")
+ggplot()+
+  ggtitle(paste("heuristic segmentation accurate within 10 bases",
+                "and much faster than optimal segmentation",
+                sep="\n"))+
+  scale_x_log10()+
+  scale_y_log10()+
+  geom_point(aes(as.numeric(as.character(param)), diff.bases),
+             data=data.frame(results.df, what="diff.bases"),
+             pch=1)+
+  facet_grid(what ~ ., scales="free")+
+  geom_hline(aes(yintercept=seconds), data=optimal.timing)+
+  geom_text(aes(10, seconds,
+                label=sprintf("optimal segmentation = \%.1f seconds",
+                  seconds)),
+            hjust=0,
+            vjust=1.5,
+            data=optimal.timing)+
+  geom_point(aes(as.numeric(as.character(expr)), time/1e9),
+             data=data.frame(times, what="seconds"), pch=1)
+
+heuristic <- subset(results.df, param=="2", select=c(chromStart, chromEnd))
+peaks <-
+  rbind(data.frame(optimal, model="optimal"),
+        data.frame(heuristic, model="heuristic"))
+ggplot()+
+  geom_step(aes(chromStart/1e3, count), data=many)+
+  scale_size_manual(values=c(optimal=2, heuristic=1))+
+  geom_segment(aes(chromStart/1e3, 0,
+                   color=model, size=model,
+                   xend=chromEnd/1e3, yend=0),
+               data=peaks)+
+  theme_bw()+
+  theme(panel.margin=grid::unit(0, "cm"))+
+  facet_grid(sample.id ~ ., scales="free")
+
 ## Heuristic in R code for debugging.
-two.list <- split(two, two$sample.id, drop=TRUE)
-max.chromStart <- max(sapply(two.list, with, chromStart[1]))
-min.chromEnd <- min(sapply(two.list, with, chromEnd[length(chromEnd)]))
+profiles <- many
+profile.list <- split(profiles, profiles$sample.id, drop=TRUE)
+max.chromStart <- max(sapply(profile.list, with, chromStart[1]))
+min.chromEnd <- min(sapply(profile.list, with, chromEnd[length(chromEnd)]))
+c(max.chromStart, min.chromEnd)
 bases <- min.chromEnd-max.chromStart
-bin.factor <- 2L
+n.samples <- length(profile.list)
+small.chromEnd <- (max.chromStart+1):min.chromEnd
+small.bins <-
+  matrix(NA, bases, n.samples,
+         dimnames=list(position=small.chromEnd,
+           sample.id=names(profile.list)))
+for(sample.id in names(profile.list)){
+  one <- profile.list[[sample.id]]
+  bins <- binSum(one, max.chromStart, n.bins=bases)
+  stopifnot(bins$chromEnd == small.chromEnd)
+  small.bins[, sample.id] <- bins$count
+}
+bin.factor <- 10L
 bases.per.bin <- 1L
 while(bases/bases.per.bin/bin.factor >= 4){
   bases.per.bin <- bases.per.bin * bin.factor
 }
-n.bins <- as.integer(floor(bases/bases.per.bin))
-n.samples <- length(two.list)
-cumsum.mat <- bin.mat <- matrix(NA, n.bins, n.samples)
+n.bins <- as.integer(bases \%/\% bases.per.bin + 1L)
+na.mat <- 
+  matrix(NA, n.bins, n.samples,
+         dimnames=list(bin=NULL, sample.id=names(profile.list)))
+first.cumsums <- list(count=na.mat)
 bin.list <- list()
 norm.list <- list()
-for(sample.i in seq_along(two.list)){
-  sample.id <- names(two.list)[sample.i]
-  one <- two.list[[sample.i]]
+for(sample.i in seq_along(profile.list)){
+  sample.id <- names(profile.list)[sample.i]
+  one <- profile.list[[sample.i]]
   max.count <- max(one$count)
   bins <- binSum(one, max.chromStart, bases.per.bin, n.bins)
+  stopifnot(n.bins == nrow(bins))
+  bins[nrow(bins), "chromEnd"] <- min.chromEnd
+  bins$mean <- with(bins, count/(chromEnd-chromStart))
   bins$mean.norm <- bins$mean/max.count
   bin.list[[sample.id]] <- data.frame(sample.id, rbind(bins, NA))
-  bin.mat[, sample.i] <- bins$count
-  cumsum.mat[, sample.i] <- cumsum(bins$count)
+  bases.vec <- with(bins, chromEnd-chromStart)
+  stopifnot(bins$count >= 0)
+  first.cumsums$count[, sample.i] <- cumsum(bins$count)
   one$count.norm <- one$count/max.count
   norm.list[[sample.i]] <- one
 }
 bin.df <- do.call(rbind, bin.list)
 norm.df <- do.call(rbind, norm.list)
-OptimalPoissonLoss <- function(cumsum.value, mean.value){
-  ifelse(cumsum.value == 0, 0, cumsum.value * (1-log(mean.value)))
+## The formula for the optimal Poisson loss 
+## for 1 segment with d integer data points x_j is
+## \sum_{j=1}^d m - x_j \log m_j =
+##   ( \sum_{j=1}^d x_j ) (1-\log m)
+## where the segment mean m = (\sum x_j)/d,
+OptimalPoissonLoss <- function(mean.value, cumsum.value){
+  ifelse(mean.value == 0, 0, cumsum.value * (1-log(mean.value)))
 }
 loss.list <- list()
+seg.list <- list()
 for(seg1.last in 1:(n.bins-2)){
-  seg1.cumsums <- cumsum.mat[seg1.last, ]
-  seg1.means <- seg1.cumsums/seg1.last/bases.per.bin
-  seg1.loss <- OptimalPoissonLoss(seg1.cumsums, seg1.means)
+  seg1.cumsums <- first.cumsums$count[seg1.last, ]
+  seg1.bases <- seg1.last*bases.per.bin
+  seg1.chromEnd <- seg1.bases + max.chromStart
+  seg1.means <- seg1.cumsums/seg1.bases
+  seg1.loss.vec <- OptimalPoissonLoss(seg1.means, seg1.cumsums)
+  seg1.loss <- sum(seg1.loss.vec)
   for(seg2.last in (seg1.last+1):(n.bins-1)){
-    seg2.cumsums <- cumsum.mat[cbind(seg2.last, 1:n.samples)]-seg1.cumsums
-    seg2.bases <- (seg2.last - seg1.last)*bases.per.bin
+    cumsum.seg2.end <- first.cumsums$count[seg2.last, ]
+    seg2.cumsums <- cumsum.seg2.end-seg1.cumsums
+    seg12.bases <- seg2.last*bases.per.bin
+    seg2.bases <- seg12.bases - seg1.bases
+    seg2.chromEnd <- seg1.chromEnd + seg2.bases
     seg2.means <- seg2.cumsums/seg2.bases
-    seg2.loss <- OptimalPoissonLoss(seg2.cumsums, seg2.means)
-    seg3.cumsums <- cumsum.mat[cbind(n.bins, 1:n.samples)]-seg2.cumsums
-    seg3.bases <- (n.bins-seg2.last)*bases.per.bin
+    seg2.loss.vec <- OptimalPoissonLoss(seg2.means, seg2.cumsums)
+    seg2.loss <- sum(seg2.loss.vec)
+    
+    seg3.cumsums <- first.cumsums$count[n.bins, ]-cumsum.seg2.end
+    seg3.bases <- bases - seg12.bases
     seg3.means <- seg3.cumsums/seg3.bases
-    seg3.loss <- OptimalPoissonLoss(seg3.cumsums, seg3.means)
+    seg3.loss.vec <- OptimalPoissonLoss(seg3.means, seg3.cumsums)
+    seg3.loss <- sum(seg3.loss.vec)
     total.loss <- seg1.loss + seg2.loss + seg3.loss
     loss.list[[paste(seg1.last, seg2.last)]] <-
       data.frame(seg1.last, seg2.last, total.loss,
+                 seg1.loss, seg2.loss, seg3.loss,
                  peakStart=seg1.last*bases.per.bin+max.chromStart,
                  peakEnd=seg2.last*bases.per.bin+max.chromStart)
+    mean.mat <- rbind(seg1.means, seg2.means, seg3.means)
+    for(sample.id in colnames(mean.mat)){
+      seg.list[[paste(seg1.last, seg2.last)]][[sample.id]] <-
+        data.frame(sample.id,
+                   chromStart=c(max.chromStart, seg1.chromEnd, seg2.chromEnd),
+                   chromEnd=c(seg1.chromEnd, seg2.chromEnd, min.chromEnd),
+                   mean=mean.mat[, sample.id])
+    }
   }
 }
 loss.df <- do.call(rbind, loss.list)
 loss.best <- loss.df[which.min(loss.df$total.loss), ]
+seg.df <- do.call(rbind, {
+  seg.list[[with(loss.best, paste(seg1.last, seg2.last))]]
+})
 
 ggplot()+
-  scale_size_manual(values=c(data=2, bins=1))+
-  scale_color_manual(values=c(data="grey50", bins="black", peak="green"))+
-  geom_step(aes(chromStart/1e3, count.norm, color=what),
+  scale_color_manual(values=c(data="grey50", bins="black", segments="green"))+
+  geom_step(aes(chromStart/1e3, count, color=what),
             data=data.frame(norm.df, what="data"))+
-  geom_segment(aes(chromStart/1e3, mean.norm,
-                   xend=chromEnd/1e3, yend=mean.norm,
+  geom_segment(aes(chromStart/1e3, mean,
+                   xend=chromEnd/1e3, yend=mean,
+                   color=what),
+               size=1,
+               data=data.frame(seg.df, what="segments"))+
+  geom_segment(aes(chromStart/1e3, mean,
+                   xend=chromEnd/1e3, yend=mean,
                    color=what),
                data=data.frame(bin.df, what="bins"))+
-  geom_segment(aes(peakStart/1e3, 0,
-                   color=what,
-                   xend=peakEnd/1e3, yend=0),
-               data=data.frame(loss.best, what="peak"))+
   theme_bw()+
   theme(panel.margin=grid::unit(0, "cm"))+
-  facet_grid(sample.id ~ .)
+  facet_grid(sample.id ~ ., scales="free", labeller=function(var, val){
+    sub("McGill0", "", val)
+  })
 
 ## These need to be computed once and then they never change.
-last.cumsum.vec <- cumsum.mat[nrow(cumsum.mat), ]
-last.chromEnd <- n.bins * bases.per.bin + max.chromStart
+last.cumsums <- list()
+before.cumsums <- list()
+for(data.type in names(first.cumsums)){
+  mat.or.vec <- first.cumsums[[data.type]]
+  if(is.matrix(mat.or.vec)){
+    last.cumsums[[data.type]] <- mat.or.vec[nrow(mat.or.vec), ]
+    before.cumsums$left[[data.type]] <- if(loss.best$seg1.last == 1){
+      rep(0, n.samples)
+    }else{
+      mat.or.vec[loss.best$seg1.last-1, ]
+    }
+    before.cumsums$right[[data.type]] <- mat.or.vec[loss.best$seg2.last-1, ]
+  }else{
+    last.cumsums[[data.type]] <- mat.or.vec[length(mat.or.vec)]
+    before.cumsums$left[[data.type]] <- if(loss.best$seg1.last == 1){
+      0
+    }else{
+      mat.or.vec[loss.best$seg1.last-1]
+    }
+    before.cumsums$right[[data.type]] <- mat.or.vec[loss.best$seg2.last-1]
+  }
+}
+last.chromEnd <- min.chromEnd
 n.bins.zoom <- bin.factor * 2L
 n.cumsum <- n.bins.zoom + 1L
 
 ## These will change at the end of each iteration.
 peakStart <- loss.best$peakStart
 peakEnd <- loss.best$peakEnd
-left.cumsum.vec <- if(loss.best$seg1.last == 1){
-  rep(0, n.samples)
-}else{
-  cumsum.mat[loss.best$seg1.last-1, ]
-}
-right.cumsum.vec <- cumsum.mat[loss.best$seg2.last-1, ]
+search.list <- list()
+best.list <- list()
 while(bases.per.bin > 1){
   left.chromStart <- peakStart - bases.per.bin
   right.chromStart <- peakEnd-bases.per.bin
   bases.per.bin <- as.integer(bases.per.bin / bin.factor)
 
-  right.cumsum.mat <- left.cumsum.mat <- matrix(NA, n.cumsum, n.samples)
-  right.limits <- bases.per.bin*(0:(n.cumsum-1))+right.chromStart
-  right.chromStart.vec <- right.limits[-length(right.limits)]
-  right.chromEnd.vec <- right.limits[-1]
-  right.intervals <-
-    paste0(right.chromStart.vec, "-", right.chromEnd.vec)
-  rownames(right.cumsum.mat) <- c("before", right.intervals)
-  left.limits <- bases.per.bin*(0:(n.cumsum-1))+left.chromStart
-  left.chromStart.vec <- left.limits[-length(left.limits)]
-  left.chromEnd.vec <- left.limits[-1]
-  left.intervals <-
-    paste0(left.chromStart.vec, "-", left.chromEnd.vec)
-  rownames(left.cumsum.mat) <- c("before", left.intervals)
-  for(sample.i in seq_along(two.list)){
-    one <- two.list[[sample.i]]
-    left.bins <- binSum(one, left.chromStart, bases.per.bin, n.bins.zoom)
-    right.bins <- binSum(one, right.chromStart, bases.per.bin, n.bins.zoom)
-    left.count <- c(left.cumsum.vec[sample.i], left.bins$count)
-    left.cumsum.mat[, sample.i] <- cumsum(left.count)
-    right.count <- c(right.cumsum.vec[sample.i], right.bins$count)
-    right.cumsum.mat[, sample.i] <- cumsum(right.count)
+  cumsum.list <- function(chromStart){
+    limits <- bases.per.bin*(0:(n.cumsum-1))+chromStart
+    chromStart.vec <- limits[-length(limits)]
+    chromEnd.vec <- limits[-1]
+    intervals <-
+      paste0(chromStart.vec, "-", chromEnd.vec)
+    dn <- list(bin=c("before", intervals), sample.id=names(profile.list))
+    m <- matrix(NA, n.cumsum, n.samples, dimnames=dn)
+    list(count=m, 
+         chromStart=chromStart.vec, chromEnd=chromEnd.vec)
+  }
+  cumsum.mats <-
+    list(left=cumsum.list(left.chromStart),
+         right=cumsum.list(right.chromStart))
+
+  for(sample.i in seq_along(profile.list)){
+    one <- profile.list[[sample.i]]
+    lr.list <-
+      list(left=binSum(one, left.chromStart, bases.per.bin, n.bins.zoom),
+           right=binSum(one, right.chromStart, bases.per.bin, n.bins.zoom,
+                        empty.as.zero=TRUE))
+    for(lr in names(lr.list)){
+      lr.bins <- lr.list[[lr]]
+      stopifnot(nrow(lr.bins) == n.bins.zoom)
+      lr.bases <- with(lr.bins, chromEnd-chromStart)
+      lr.before <- before.cumsums[[lr]]
+      lr.counts <- list(count=lr.bins$count)
+      for(data.type in names(lr.counts)){
+        lr.count.vec <-
+          c(lr.before[[data.type]][[sample.i]], lr.counts[[data.type]])
+        cumsum.mats[[lr]][[data.type]][, sample.i] <-
+          cumsum(lr.count.vec)
+      }
+    }
   }
   possible.grid <- 
-  expand.grid(left.cumsum.row=3:n.cumsum, right.cumsum.row=2:n.cumsum)
+    expand.grid(left.cumsum.row=3:n.cumsum, right.cumsum.row=2:n.cumsum)
   possible.grid$left.chromStart <-
-    left.chromStart.vec[possible.grid$left.cumsum.row-1]
+    cumsum.mats$left$chromStart[possible.grid$left.cumsum.row-1]
   possible.grid$left.chromEnd <-
-    left.chromEnd.vec[possible.grid$left.cumsum.row-1]
+    cumsum.mats$left$chromEnd[possible.grid$left.cumsum.row-1]
   possible.grid$right.chromStart <-
-    right.chromStart.vec[possible.grid$right.cumsum.row-1]
+    cumsum.mats$right$chromStart[possible.grid$right.cumsum.row-1]
   possible.grid$right.chromEnd <-
-    right.chromEnd.vec[possible.grid$right.cumsum.row-1]
+    cumsum.mats$right$chromEnd[possible.grid$right.cumsum.row-1]
   feasible.grid <-
     subset(possible.grid,
            left.chromEnd <= right.chromStart &
@@ -260,36 +385,55 @@ while(bases.per.bin > 1){
   seg.list <- list()
   for(model.i in feasible.grid$model.i){
     model.row <- feasible.grid[model.i, ]
-    
-    seg1.cumsums <- left.cumsum.mat[model.row$left.cumsum.row-1, ]
-    seg1.chromEnd <- left.chromStart.vec[model.row$left.cumsum.row-1]
+
+    seg1.i <- model.row$left.cumsum.row-1
+    seg1.cumsums <- cumsum.mats$left$count[seg1.i, ]
+    seg1.chromEnd <- cumsum.mats$left$chromStart[seg1.i]
     seg1.bases <- seg1.chromEnd-max.chromStart
     seg1.means <- seg1.cumsums/seg1.bases
-    seg1.loss <- OptimalPoissonLoss(seg1.cumsums, seg1.means)
+    seg1.loss <- OptimalPoissonLoss(seg1.means, seg1.cumsums)
     seg.list[[paste(model.i, 1)]] <-
       data.frame(chromStart=max.chromStart, chromEnd=seg1.chromEnd,
-                 mean=seg1.means, sample.id=names(two.list),
+                 mean=seg1.means, sample.id=names(profile.list),
                  model.i)
-    
-    right.cumsum.row <- right.cumsum.mat[model.row$right.cumsum.row, ]
-    seg2.cumsums <- right.cumsum.row-seg1.cumsums
-    seg2.chromEnd <- right.chromEnd.vec[model.row$right.cumsum.row-1]
+
+    seg1.mat <- small.bins[small.chromEnd <= seg1.chromEnd, ]
+    stopifnot(nrow(seg1.mat) == seg1.bases)
+    stopifnot(all.equal(colMeans(seg1.mat), seg1.means))
+
+    cumsum.seg2.end <- cumsum.mats$right$count[model.row$right.cumsum.row, ]
+    seg2.cumsums <- cumsum.seg2.end-seg1.cumsums
+    seg2.chromEnd <- cumsum.mats$right$chromEnd[model.row$right.cumsum.row-1]
     seg2.bases <- seg2.chromEnd-seg1.chromEnd
     seg2.means <- seg2.cumsums/seg2.bases
-    seg2.loss <- OptimalPoissonLoss(seg2.cumsums, seg2.means)
+    seg2.loss <- OptimalPoissonLoss(seg2.means, seg2.cumsums)
     seg.list[[paste(model.i, 2)]] <-
       data.frame(chromStart=seg1.chromEnd, chromEnd=seg2.chromEnd,
-                 mean=seg2.means, sample.id=names(two.list),
+                 mean=seg2.means, sample.id=names(profile.list),
                  model.i)
+
+    is.seg2 <-
+      seg1.chromEnd < small.chromEnd &
+        small.chromEnd <= seg2.chromEnd
+    stopifnot(sum(is.seg2) == seg2.bases)
+    seg2.mat <- small.bins[is.seg2, ]
+    stopifnot(all.equal(colMeans(seg2.mat), seg2.means))
     
-    seg3.cumsums <- last.cumsum.vec-right.cumsum.row
+    seg3.cumsums <- last.cumsums$count-cumsum.seg2.end
     seg3.bases <- last.chromEnd-seg2.chromEnd
     seg3.means <- seg3.cumsums/seg3.bases
-    seg3.loss <- OptimalPoissonLoss(seg3.cumsums, seg3.means)
+    seg3.loss <- OptimalPoissonLoss(seg3.means, seg3.cumsums)
     seg.list[[paste(model.i, 3)]] <-
       data.frame(chromStart=seg2.chromEnd, chromEnd=last.chromEnd,
-                 mean=seg3.means, sample.id=names(two.list),
+                 mean=seg3.means, sample.id=names(profile.list),
                  model.i)
+
+    is.seg3 <-
+      seg2.chromEnd < small.chromEnd &
+        small.chromEnd <= last.chromEnd
+    stopifnot(sum(is.seg3) == seg3.bases)
+    seg3.mat <- small.bins[is.seg3, ]
+    ##stopifnot(all.equal(colMeans(seg3.mat), seg3.means))
 
     total.bases <- sum(seg1.bases + seg2.bases + seg3.bases)
     stopifnot(all.equal(total.bases, last.chromEnd - max.chromStart))
@@ -306,17 +450,19 @@ while(bases.per.bin > 1){
   geom_segment(aes(chromStart/1e3, mean,
                    xend=chromEnd/1e3, yend=mean),
                data=data.frame(seg.df, what="models"),
-               size=4, color="green")+
+               size=1, color="green")+
   theme_bw()+
   theme(panel.margin=grid::unit(0, "cm"))+
   facet_grid(sample.id ~ model.i, scales="free")
 
   ## Then plot the peaks only, colored by total cost of the model.
   model.df <- do.call(rbind, model.list)
-  model.df$y <- -model.df$model.i * 0.1
+  model.df$y <- with(model.df, model.i/max(model.i))
   best.model <- model.df[which.min(model.df$total.loss), ]
 
   ggplot()+
+    xlab("position on chromosome (kilobases = kb)")+
+    scale_y_continuous("", breaks=NULL)+
   geom_step(aes(chromStart/1e3, count.norm),
             data=data.frame(norm.df, what="data"),
             color="grey")+
@@ -331,20 +477,95 @@ while(bases.per.bin > 1){
   geom_segment(aes(left.chromStart/1e3, y,
                    color=total.loss,
                    xend=right.chromEnd/1e3, yend=y),
-               data=data.frame(model.df, what="models"),
-               size=4)+
+               data=data.frame(model.df, sample.id="peaks"),
+               size=1)+
   geom_text(aes(left.chromStart/1e3, y,
                 label="optimal "),
-            data=best.model,
+            data=data.frame(best.model, sample.id="peaks"),
             hjust=1)+
   theme_bw()+
   theme(panel.margin=grid::unit(0, "cm"))+
   facet_grid(sample.id ~ .)
 
+  search.list[[paste(bases.per.bin)]] <-
+    data.frame(bases.per.bin, model.df)
+  best.list[[paste(bases.per.bin)]] <-
+    data.frame(bases.per.bin, best.model)
+
   peakStart <- best.model$left.chromStart
   peakEnd <- best.model$right.chromEnd
-  left.cumsum.vec <- left.cumsum.mat[best.model$left.cumsum.row-2, ]
-  right.cumsum.vec <- right.cumsum.mat[best.model$right.cumsum.row-1, ]
+  before.i.list <-
+    list(left=best.model$left.cumsum.row-2,
+         right=best.model$right.cumsum.row-1)
+  for(lr in names(before.i.list)){
+    before.i <- before.i.list[[lr]]
+    mats <- cumsum.mats[[lr]]
+    before.cumsums[[lr]]$count <- mats$count[before.i, ]
+  }
 }
+samplefac <- function(L){
+  df <- do.call(rbind, L)
+  sample.ids <- unique(norm.df$sample.id)
+  bases.num <- sort(unique(df$bases.per.bin), decreasing=TRUE)
+  levs <- c(paste(sample.ids), paste(bases.num))
+  df$sample.id <- factor(df$bases.per.bin, levs)
+  df
+}
+search.df <- samplefac(search.list)
+best.df <- samplefac(best.list)
+searchPlot <- 
+  ggplot()+
+    xlab("position on chromosome (kilobases = kb)")+
+    scale_y_continuous("", breaks=NULL)+
+  geom_step(aes(chromStart/1e3, count.norm),
+            data=data.frame(norm.df, what="data"),
+            color="grey")+
+  geom_segment(aes(chromStart/1e3, mean.norm,
+                   xend=chromEnd/1e3, yend=mean.norm),
+               data=data.frame(bin.df, what="bins"),
+               color="black")+
+  geom_vline(aes(xintercept=chromStart/1e3),
+             data=optimal,
+             color="green")+
+  geom_vline(aes(xintercept=chromEnd/1e3),
+             data=optimal,
+             color="green")+
+  geom_segment(aes(left.chromStart/1e3, y,
+                   color=total.loss,
+                   xend=right.chromEnd/1e3, yend=y),
+               data=search.df,
+               size=1)+
+  geom_text(aes(left.chromStart/1e3, y,
+                label="selected"),
+            data=best.df,
+            hjust=1)+
+  theme_bw()+
+  theme(panel.margin=grid::unit(0, "cm"))+
+  facet_grid(sample.id ~ ., labeller=function(var, val){
+    sub("McGill0", "", val)
+  })
+print(searchPlot)
+rbind(optimal=optimal,
+      heuristic=data.frame(chromStart=peakStart, chromEnd=peakEnd))
 
+## This data set caused a problem in peakStart.
+library(PeakSegDP)
+data(H3K36me3.TDH.other.chunk3.cluster4)
+many <- H3K36me3.TDH.other.chunk3.cluster4
+heuristic.seconds <- system.time({
+  heuristic <- multiSampleSegHeuristic(many, 10L)
+})[["elapsed"]]
+min.chromStart <- min(many$chromStart)
+max.chromEnd <- max(many$chromEnd)
+ggplot()+
+  geom_step(aes(chromStart/1e3, count), data=many)+
+  geom_segment(aes(chromStart/1e3, 0,
+                   xend=chromEnd/1e3, yend=0),
+               data=heuristic,
+               color="green",
+               size=1)+
+  theme_bw()+
+  coord_cartesian(xlim=c(min.chromStart, max.chromEnd)/1e3)+
+  theme(panel.margin=grid::unit(0, "cm"))+
+  facet_grid(sample.id ~ ., scales="free")
 }
