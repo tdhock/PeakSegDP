@@ -82,6 +82,9 @@ for(chrom in chroms){
     }#if(file.exists(RData.path))/else
 
     fmat <- rbind(seg.info$features)
+    ## Set any non-finite features to 0 so we can predict a finite
+    ## penalty value for all possible test data.
+    fmat[!is.finite(fmat)] <- 0
     lmat <- learned.model$predict(fmat)
     pred.log.lambda <- as.numeric(lmat)
 
