@@ -24,7 +24,8 @@ chromProblems <- function
     problemEnd <- peakEnd <- last.chromEnd
     problemStart <- peakStart <- first.chromStart
     problems <- 
-      data.table(chromStart=problemStart,
+      data.frame(chrom,
+                 chromStart=problemStart,
                  peakStart,
                  peakEnd,
                  chromEnd=problemEnd)
@@ -33,7 +34,8 @@ chromProblems <- function
     peakStart <- as.integer(problemStart + bases.per.problem/4)
     peakEnd <- as.integer(problemEnd - bases.per.problem/4)
     problems <- 
-      data.table(chromStart=as.integer(c(0,
+      data.frame(chrom,
+                 chromStart=as.integer(c(0,
                    problemStart, problemEnd[length(problemEnd)-1])),
                  peakStart=as.integer(c(0,
                    peakStart, peakEnd[length(peakEnd)])),
@@ -41,10 +43,10 @@ chromProblems <- function
                  chromEnd=as.integer(c(bases.per.problem,
                    problemEnd, last.chromEnd)))
   }
-  problems[, problem.name :=
-             sprintf("%s:%09d-%09d", chrom, chromStart, chromEnd)]
+  problems$problem.name <- 
+    with(problems, sprintf("%s:%09d-%09d", chrom, chromStart, chromEnd))
   problem.before <- problems$chromEnd < first.chromStart
   problems[!problem.before, ]
-### data.table with columns chromStart, peakStart, peakEnd, chromEnd,
+### data.frame with columns chromStart, peakStart, peakEnd, chromEnd,
 ### problem.name.
 }
