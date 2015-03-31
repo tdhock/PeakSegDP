@@ -91,6 +91,7 @@ all.problem.list <- list()# for deterimining where to keep peaks.
 for(chrom in names(regions.by.chrom)){
   chrom.regions <- regions.by.chrom[[chrom]]
   chrom.coverage <- sample.coverage[chrom]
+  first.chromStart <- chrom.coverage$chromStart[1]
   chrom.bases <- max(chrom.coverage$chromEnd)
   for(problem.size.i in 1:nrow(feasible.resolutions)){
     res.row <- feasible.resolutions[problem.size.i, ]
@@ -98,21 +99,8 @@ for(chrom in names(regions.by.chrom)){
     bases.per.bin <- as.integer(res.row$bases.per.bin)
     chrom.dir <- file.path(base.dir, bases.per.bin, chrom)
 
-    problemEnd <-
-      as.integer(seq(0, chrom.bases, by=bases.per.problem/2)[-(1:3)])
-    problemStart <- as.integer(problemEnd-bases.per.problem)
-    peakStart <- as.integer(problemStart + bases.per.problem/4)
-    peakEnd <- as.integer(problemEnd - bases.per.problem/4)
-    problems <- 
-      data.table(chromStart=as.integer(c(0,
-                   problemStart, problemEnd[length(problemEnd)-1])),
-                 peakStart=as.integer(c(0,
-                   peakStart, peakEnd[length(peakEnd)])),
-                 peakEnd=as.integer(c(peakStart[1], peakEnd, chrom.bases)),
-                 chromEnd=as.integer(c(bases.per.problem,
-                   problemEnd, chrom.bases)))
-    problems[, problem.name :=
-             sprintf("%s:%09d-%09d", chrom, chromStart, chromEnd)]
+    problems <-
+      chromProblems(first.chromStart, chrom.bases, bases.per.problem)
 
     all.problem.list[[paste(bases.per.bin)]][[chrom]] <- problems
 

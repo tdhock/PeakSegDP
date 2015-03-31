@@ -11,12 +11,12 @@ if(length(argv) != 2){
   stop("usage: Rscript Step3.R learned.model.RData profile.bedGraph")
 }
 
-RData.path <- normalizePath(argv[1], mustWork=TRUE)
+model.RData.path <- normalizePath(argv[1], mustWork=TRUE)
 bedGraph.path <- normalizeDir(argv[2])
 base.dir <- sub("[.][a-zA-Z]*$", "", bedGraph.path)
 
-cat("Reading learned model ", RData.path, "\n", sep="")
-model.object.names <- load(RData.path)
+cat("Reading learned model ", model.RData.path, "\n", sep="")
+model.object.names <- load(model.RData.path)
 
 cat("Reading profile coverage ", bedGraph.path, "\n", sep="")
 sample.coverage <- fread(bedGraph.path)
@@ -38,24 +38,9 @@ for(chrom in chroms){
   chrom.dir <- file.path(base.dir, bases.per.bin, chrom)
   chrom.coverage <- sample.coverage[chrom]
   chrom.bases <- max(chrom.coverage$chromEnd)
-  problemEnd <-
-    as.integer(seq(0, chrom.bases, by=bases.per.problem/2)[-(1:3)])
-  problemStart <- as.integer(problemEnd-bases.per.problem)
-  peakStart <- as.integer(problemStart + bases.per.problem/4)
-  peakEnd <- as.integer(problemEnd - bases.per.problem/4)
-  problems <- 
-    data.table(chromStart=as.integer(c(0,
-                 problemStart, problemEnd[length(problemEnd)-1])),
-               peakStart=as.integer(c(0,
-                 peakStart, peakEnd[length(peakEnd)])),
-               peakEnd=as.integer(c(peakStart[1], peakEnd, chrom.bases)),
-               chromEnd=as.integer(c(bases.per.problem,
-                 problemEnd, chrom.bases)))
-  problems[, problem.name :=
-             sprintf("%s:%09d-%09d", chrom, chromStart, chromEnd)]
   first.chromStart <- chrom.coverage$chromStart[1]
-  problem.before <- problems$chromEnd < first.chromStart
-  some.problems <- problems[!problem.before, ]
+  some.problems <-
+    chromProblems(first.chromStart, chrom.bases, bases.per.problem)
   setkey(some.problems, chromStart, chromEnd)
   setkey(chrom.coverage, chromStart, chromEnd)
   chrom.peak.list <- list()
@@ -104,18 +89,20 @@ for(chrom in chroms){
     }
   }#problem.i
   all.chrom.peaks <- do.call(rbind, chrom.peak.list)
-  clustered.peaks <- clusterPeaks(all.chrom.peaks)
-  table(clustered.peaks$cluster)
-  clustered.peak.list <- split(clustered.peaks, clustered.peaks$cluster)
-  reduced.peak.list <- list()
-  for(cluster.str in names(clustered.peak.list)){
-    peaks <- clustered.peak.list[[cluster.str]]
-    reduced.peak.list[[cluster.str]] <- 
-      data.frame(chromStart=peaks$chromStart[1],
-                 chromEnd=peaks$chromEnd[nrow(peaks)])
+  if(!is.null(all.chrom.peaks)){
+    clustered.peaks <- clusterPeaks(all.chrom.peaks)
+    table(clustered.peaks$cluster)
+    clustered.peak.list <- split(clustered.peaks, clustered.peaks$cluster)
+    reduced.peak.list <- list()
+    for(cluster.str in names(clustered.peak.list)){
+      peaks <- clustered.peak.list[[cluster.str]]
+      reduced.peak.list[[cluster.str]] <- 
+        data.frame(chromStart=peaks$chromStart[1],
+                   chromEnd=peaks$chromEnd[nrow(peaks)])
+    }
+    reduced.peaks <- do.call(rbind, reduced.peak.list)
+    sample.peak.list[[chrom]] <- data.table(chrom, reduced.peaks)
   }
-  reduced.peaks <- do.call(rbind, reduced.peak.list)
-  sample.peak.list[[chrom]] <- data.table(chrom, reduced.peaks)
 }#chrom
 
 sample.peaks <- do.call(rbind, sample.peak.list)
