@@ -19,9 +19,11 @@ segmentBins <- function
              bin.size=bases.per.bin)
   })[["elapsed"]]
 
-  cDPA.seconds <- system.time({
-    fit <- PeakSegDP(bins, maxPeaks = 9L)
-  })[["elapsed"]]
+  maxSegments <- nrow(bins)
+  this.max <- as.integer(min((maxSegments-1)/2, maxPeaks))
+  cDPA.seconds <- system.time(suppressWarnings({
+    fit <- PeakSegDP(bins, maxPeaks = this.max)
+  }))[["elapsed"]]
 
   ## Compute feature vector for learning using this segmentation
   ## problem.
