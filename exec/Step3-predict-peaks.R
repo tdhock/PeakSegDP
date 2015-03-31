@@ -39,8 +39,9 @@ for(chrom in chroms){
   chrom.coverage <- sample.coverage[chrom]
   chrom.bases <- max(chrom.coverage$chromEnd)
   first.chromStart <- chrom.coverage$chromStart[1]
-  some.problems <-
+  problems.df <-
     chromProblems(chrom, first.chromStart, chrom.bases, bases.per.problem)
+  some.problems <- data.table(problems.df)
   setkey(some.problems, chromStart, chromEnd)
   setkey(chrom.coverage, chromStart, chromEnd)
   chrom.peak.list <- list()

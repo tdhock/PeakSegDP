@@ -99,9 +99,10 @@ for(chrom in names(regions.by.chrom)){
     bases.per.bin <- as.integer(res.row$bases.per.bin)
     chrom.dir <- file.path(base.dir, bases.per.bin, chrom)
 
-    problems <-
+    problems.df <-
       chromProblems(chrom, first.chromStart, chrom.bases, bases.per.problem)
 
+    problems <- data.table(problem.df)
     all.problem.list[[paste(bases.per.bin)]][[chrom]] <- problems
 
     ## Figure out which problems overlap which regions.
