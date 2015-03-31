@@ -1,16 +1,20 @@
 chromProblems <- function
 ### Divide a chromosome into a set of overlapping segmentation
 ### problems.
-(first.chromStart,
+(chrom,
+### character chromosome name.
+ first.chromStart,
 ### Base before the first base on this chromosome.
  last.chromEnd,
 ### Last base on this chromosome.
  bases.per.problem
 ### How many bases in each segmentation problem?
  ){
+  stopifnot(is.character(chrom))
   stopifnot(is.integer(first.chromStart))
   stopifnot(is.integer(last.chromEnd))
   stopifnot(is.integer(bases.per.problem))
+  stopifnot(length(chrom)==1)
   stopifnot(length(first.chromStart)==1)
   stopifnot(length(last.chromEnd)==1)
   stopifnot(length(bases.per.problem)==1)

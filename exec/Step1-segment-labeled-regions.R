@@ -100,7 +100,7 @@ for(chrom in names(regions.by.chrom)){
     chrom.dir <- file.path(base.dir, bases.per.bin, chrom)
 
     problems <-
-      chromProblems(first.chromStart, chrom.bases, bases.per.problem)
+      chromProblems(chrom, first.chromStart, chrom.bases, bases.per.problem)
 
     all.problem.list[[paste(bases.per.bin)]][[chrom]] <- problems
 
