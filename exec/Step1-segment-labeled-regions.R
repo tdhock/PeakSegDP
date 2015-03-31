@@ -102,7 +102,7 @@ for(chrom in names(regions.by.chrom)){
     problems.df <-
       chromProblems(chrom, first.chromStart, chrom.bases, bases.per.problem)
 
-    problems <- data.table(problem.df)
+    problems <- data.table(problems.df)
     all.problem.list[[paste(bases.per.bin)]][[chrom]] <- problems
 
     ## Figure out which problems overlap which regions.
