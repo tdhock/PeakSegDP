@@ -15,6 +15,7 @@ if(length(argv) != 1){
 where there are path/to/*/*.bedGraph files")
 }
 labels.txt.file <- normalizePath(argv[1], mustWork=TRUE)
+data.dir <- dirname(labels.txt.file) 
 
 ## Step0 does not take very long so we can just do it live in this
 ## script.
@@ -25,10 +26,10 @@ cmd <- paste(Rscript, Step0, labels.txt.file)
 system(cmd)
 
 ## Step1 takes a while so we run it with qsub.
+data.dir <- normalizePath(data.dir, mustWork=TRUE)#NEEDS TO BE ABSOLUTE!
 Step1 <-
   system.file(file.path("exec", "Step1-segment-labeled-regions.R"),
               package="PeakSegDP")
-data.dir <- dirname(labels.txt.file)
 labels.files <- Sys.glob(file.path(data.dir, "*", "*_labels.bed"))
 residual.qsub.id.list <- list()
 for(labels.file in labels.files){
