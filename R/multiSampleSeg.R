@@ -607,3 +607,28 @@ multiSampleSegOptimal <- function
   data.frame(chromStart=chromStartEnd[1],
              chromEnd=chromStartEnd[2])
 }
+
+multiSampleSegSome <- structure(function
+### Given N samples, find the best overlapping peak in 0, 1, ..., N
+### samples.
+(profiles,
+ bin.factor){
+}, ex=function(){
+  library(PeakSegDP)
+
+  data(chr11ChIPseq)
+  two.up.two.down <- subset(chr11ChIPseq$coverage,
+                118090000 < chromStart &
+                chromEnd < 118100000)
+  library(ggplot2)
+  ggplot()+
+    geom_step(aes(chromStart/1e3, count), data=two.up.two.down)+
+    scale_size_manual(values=c(optimal=2, heuristic=1))+
+    ## geom_segment(aes(chromStart/1e3, 0,
+    ##                  color=model, size=model,
+    ##                  xend=chromEnd/1e3, yend=0),
+    ##              data=peaks)+
+    theme_bw()+
+    theme(panel.margin=grid::unit(0, "cm"))+
+    facet_grid(sample.id ~ ., scales="free")
+})

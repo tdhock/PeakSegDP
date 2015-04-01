@@ -33,7 +33,7 @@ bins.per.problem <- 2000L
 bases.per.problem <- bases.per.bin * bins.per.problem
 
 chroms <- unique(sample.coverage$chrom)
-sample.peak.list <- list()
+problem.list <- list()
 for(chrom in chroms){
   chrom.dir <- file.path(base.dir, bases.per.bin, chrom)
   chrom.coverage <- sample.coverage[chrom]
@@ -41,7 +41,31 @@ for(chrom in chroms){
   first.chromStart <- chrom.coverage$chromStart[1]
   problems.df <-
     chromProblems(chrom, first.chromStart, chrom.bases, bases.per.problem)
-  some.problems <- data.table(problems.df)
+  problem.list[[chrom]] <- data.table(problems.df)
+}
+problems.per.chrom <- sapply(problem.list, nrow)
+total.problems <- sum(problems.per.chrom)
+seconds.per.problem <- 1 # about 1 second per problem.
+estimated.seconds <- total.problems * seconds.per.problem
+seconds2hhmmss <- function(seconds){
+  minutes <- seconds %/% 60
+  seconds.extra <- seconds %% 60
+  hours <- minutes %/% 60
+  minutes.extra <- minutes %% 60
+  sprintf("%02d:%02d:%02d", hours, minutes.extra, seconds.extra)
+}
+cat("Predicting peaks for ", total.problems,
+    " segmentation problems, estimated time\n",
+    seconds2hhmmss(estimated.seconds),
+    " (", seconds.per.problem, " sec/problem)\n",
+    sep="")
+
+sample.peak.list <- list()
+problem.time.list <- list()
+for(chrom in chroms){
+  chrom.dir <- file.path(base.dir, bases.per.bin, chrom)
+  some.problems <- problem.list[[chrom]]
+  chrom.coverage <- sample.coverage[chrom]
   setkey(some.problems, chromStart, chromEnd)
   setkey(chrom.coverage, chromStart, chromEnd)
   chrom.peak.list <- list()
@@ -49,45 +73,47 @@ for(chrom in chroms){
     problem <- some.problems[problem.i, ]
     problem.coverage <- foverlaps(chrom.coverage, problem, nomatch = 0L)
     problem.name <- problem$problem.name
-    RData.base <- paste0(problem.name, ".RData")
-    RData.path <- file.path(chrom.dir, RData.base)
-    RData.dir <- dirname(RData.path)
-    dir.create(RData.dir, showWarnings = FALSE, recursive = TRUE)
-    if(file.exists(RData.path)){
-      load(RData.path)
-    }else{
-      cat(RData.path, "\n")
+    problem.time.list[[problem.name]] <- system.time({
+      RData.base <- paste0(problem.name, ".RData")
+      RData.path <- file.path(chrom.dir, RData.base)
+      RData.dir <- dirname(RData.path)
+      dir.create(RData.dir, showWarnings = FALSE, recursive = TRUE)
+      if(file.exists(RData.path)){
+        load(RData.path)
+      }else{
+        cat(RData.path, "\n")
 
-      seg.info <-
-        segmentBins(chrom.coverage,
-                    problem$chromStart,
-                    bases.per.bin,
-                    bins.per.problem)
+        seg.info <-
+          segmentBins(chrom.coverage,
+                      problem$chromStart,
+                      bases.per.bin,
+                      bins.per.problem)
 
-      save(seg.info, file=RData.path)
-    }#if(file.exists(RData.path))/else
+        save(seg.info, file=RData.path)
+      }#if(file.exists(RData.path))/else
 
-    fmat <- rbind(seg.info$features)
-    ## Set any non-finite features to 0 so we can predict a finite
-    ## penalty value for all possible test data.
-    fmat[!is.finite(fmat)] <- 0
-    lmat <- learned.model$predict(fmat)
-    pred.log.lambda <- as.numeric(lmat)
+      fmat <- rbind(seg.info$features)
+      ## Set any non-finite features to 0 so we can predict a finite
+      ## penalty value for all possible test data.
+      fmat[!is.finite(fmat)] <- 0
+      lmat <- learned.model$predict(fmat)
+      pred.log.lambda <- as.numeric(lmat)
 
-    selected <-
-      subset(seg.info$modelSelection,
-             min.log.lambda < pred.log.lambda &
-               pred.log.lambda < max.log.lambda)
-    stopifnot(nrow(selected) == 1)
-    param.name <- paste(selected$peaks)
+      selected <-
+        subset(seg.info$modelSelection,
+               min.log.lambda < pred.log.lambda &
+                 pred.log.lambda < max.log.lambda)
+      stopifnot(nrow(selected) == 1)
+      param.name <- paste(selected$peaks)
 
-    peaks <- data.table(seg.info$fit$peaks[[param.name]])
-    if(nrow(peaks)){
-      is.before <- peaks$chromEnd < problem$peakStart
-      is.after <- problem$peakEnd < peaks$chromStart
-      not.in.region <- is.before | is.after
-      chrom.peak.list[[problem.name]] <- peaks[!not.in.region, ]
-    }
+      peaks <- data.table(seg.info$fit$peaks[[param.name]])
+      if(nrow(peaks)){
+        is.before <- peaks$chromEnd < problem$peakStart
+        is.after <- problem$peakEnd < peaks$chromStart
+        not.in.region <- is.before | is.after
+        chrom.peak.list[[problem.name]] <- peaks[!not.in.region, ]
+      }
+    })[["elapsed"]]
   }#problem.i
   all.chrom.peaks <- do.call(rbind, chrom.peak.list)
   if(!is.null(all.chrom.peaks)){
@@ -105,6 +131,13 @@ for(chrom in chroms){
     sample.peak.list[[chrom]] <- data.table(chrom, reduced.peaks)
   }
 }#chrom
+elapsed.seconds <- sum(unlist(problem.time.list))
+print(elapsed.seconds)
+cat(seconds2hhmmss(as.integer(elapsed.seconds)),
+    " for ",
+    total.problems,
+    " segmentation problems \n",
+    sep="")
 
 sample.peaks <- do.call(rbind, sample.peak.list)
 cat("Peak counts per chromosome:\n")
