@@ -16,7 +16,8 @@ segmentBins <- function
     bins <- 
       binSum(compressed,
              bin.chromStart=bin.chromStart,
-             bin.size=bases.per.bin)
+             bin.size=bases.per.bin,
+             n.bins=n.bins)
   })[["elapsed"]]
 
   maxSegments <- nrow(bins)
