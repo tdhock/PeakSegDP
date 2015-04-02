@@ -114,6 +114,7 @@ ggplot()+
 ## plot microbenchmark time versus parameter.
 data(H3K4me3.TDH.immune.chunk12.cluster4)
 many <- H3K4me3.TDH.immune.chunk12.cluster4
+optimal <- c(27998215, 27999159)
 optimal.seconds <- system.time({
   optimal <- multiSampleSegOptimal(many)
 })[["elapsed"]]
@@ -156,6 +157,9 @@ ggplot()+
             data=optimal.timing)+
   geom_point(aes(as.numeric(as.character(expr)), time/1e9),
              data=data.frame(times, what="seconds"), pch=1)
+## The biggest observed deviation of the Heuristic result from the
+## optimal result is 17 bases (for bin.factor=30).
+stopifnot(results.df$diff.bases < 20)
 
 heuristic <- subset(results.df, param=="2", select=c(chromStart, chromEnd))
 peaks <-
@@ -387,7 +391,7 @@ while(bases.per.bin > 1){
     model.row <- feasible.grid[model.i, ]
 
     seg1.i <- model.row$left.cumsum.row-1
-    seg1.cumsums <- cumsum.mats$left$count[seg1.i, ]
+    seg1.cumsums <- cumsum.mats$left$count[seg1.i, , drop=FALSE]
     seg1.chromEnd <- cumsum.mats$left$chromStart[seg1.i]
     seg1.bases <- seg1.chromEnd-max.chromStart
     seg1.means <- seg1.cumsums/seg1.bases
@@ -395,13 +399,17 @@ while(bases.per.bin > 1){
     seg.list[[paste(model.i, 1)]] <-
       data.frame(chromStart=max.chromStart, chromEnd=seg1.chromEnd,
                  mean=seg1.means, sample.id=names(profile.list),
-                 model.i)
+                 model.i,
+                 row.names=NULL)
 
-    seg1.mat <- small.bins[small.chromEnd <= seg1.chromEnd, ]
+    seg1.mat <-
+      small.bins[small.chromEnd <= seg1.chromEnd, , drop=FALSE]
     stopifnot(nrow(seg1.mat) == seg1.bases)
-    stopifnot(all.equal(colMeans(seg1.mat), seg1.means))
+    stopifnot(all.equal(as.numeric(colMeans(seg1.mat)),
+                        as.numeric(seg1.means)))
 
-    cumsum.seg2.end <- cumsum.mats$right$count[model.row$right.cumsum.row, ]
+    cumsum.seg2.end <-
+      cumsum.mats$right$count[model.row$right.cumsum.row, , drop=FALSE]
     seg2.cumsums <- cumsum.seg2.end-seg1.cumsums
     seg2.chromEnd <- cumsum.mats$right$chromEnd[model.row$right.cumsum.row-1]
     seg2.bases <- seg2.chromEnd-seg1.chromEnd
@@ -410,14 +418,16 @@ while(bases.per.bin > 1){
     seg.list[[paste(model.i, 2)]] <-
       data.frame(chromStart=seg1.chromEnd, chromEnd=seg2.chromEnd,
                  mean=seg2.means, sample.id=names(profile.list),
-                 model.i)
+                 model.i,
+                 row.names=NULL)
 
     is.seg2 <-
       seg1.chromEnd < small.chromEnd &
         small.chromEnd <= seg2.chromEnd
     stopifnot(sum(is.seg2) == seg2.bases)
-    seg2.mat <- small.bins[is.seg2, ]
-    stopifnot(all.equal(colMeans(seg2.mat), seg2.means))
+    seg2.mat <- small.bins[is.seg2, , drop=FALSE]
+    stopifnot(all.equal(as.numeric(colMeans(seg2.mat)),
+                        as.numeric(seg2.means)))
     
     seg3.cumsums <- last.cumsums$count-cumsum.seg2.end
     seg3.bases <- last.chromEnd-seg2.chromEnd
@@ -426,13 +436,14 @@ while(bases.per.bin > 1){
     seg.list[[paste(model.i, 3)]] <-
       data.frame(chromStart=seg2.chromEnd, chromEnd=last.chromEnd,
                  mean=seg3.means, sample.id=names(profile.list),
-                 model.i)
+                 model.i,
+                 row.names=NULL)
 
     is.seg3 <-
       seg2.chromEnd < small.chromEnd &
         small.chromEnd <= last.chromEnd
     stopifnot(sum(is.seg3) == seg3.bases)
-    seg3.mat <- small.bins[is.seg3, ]
+    seg3.mat <- small.bins[is.seg3, , drop=FALSE]
     ##stopifnot(all.equal(colMeans(seg3.mat), seg3.means))
 
     total.bases <- sum(seg1.bases + seg2.bases + seg3.bases)

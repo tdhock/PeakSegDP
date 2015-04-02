@@ -411,7 +411,8 @@ multiSampleSegHeuristic <- structure(function
       seg.list[[paste(model.i, 1)]] <-
         data.frame(chromStart=max.chromStart, chromEnd=seg1.chromEnd,
                    mean=seg1.means, sample.id=names(profile.list),
-                   model.i)
+                   model.i,
+                   row.names=NULL)
 
       seg1.mat <-
         small.bins[small.chromEnd <= seg1.chromEnd, , drop=FALSE]
@@ -429,7 +430,8 @@ multiSampleSegHeuristic <- structure(function
       seg.list[[paste(model.i, 2)]] <-
         data.frame(chromStart=seg1.chromEnd, chromEnd=seg2.chromEnd,
                    mean=seg2.means, sample.id=names(profile.list),
-                   model.i)
+                   model.i,
+                   row.names=NULL)
 
       is.seg2 <-
         seg1.chromEnd < small.chromEnd &
@@ -446,13 +448,14 @@ multiSampleSegHeuristic <- structure(function
       seg.list[[paste(model.i, 3)]] <-
         data.frame(chromStart=seg2.chromEnd, chromEnd=last.chromEnd,
                    mean=seg3.means, sample.id=names(profile.list),
-                   model.i)
+                   model.i,
+                   row.names=NULL)
 
       is.seg3 <-
         seg2.chromEnd < small.chromEnd &
           small.chromEnd <= last.chromEnd
       stopifnot(sum(is.seg3) == seg3.bases)
-      seg3.mat <- small.bins[is.seg3, samples.with.peaks, drop=FALSE]
+      seg3.mat <- small.bins[is.seg3, , drop=FALSE]
       ##stopifnot(all.equal(colMeans(seg3.mat), seg3.means))
 
       total.bases <- sum(seg1.bases + seg2.bases + seg3.bases)
@@ -1004,7 +1007,8 @@ multiSampleSegSome <- structure(function
         seg.list[[paste(model.i, 1)]] <-
           data.frame(chromStart=max.chromStart, chromEnd=seg1.chromEnd,
                      mean=seg1.means, sample.id=samples.with.peaks,
-                     model.i)
+                     model.i,
+                     row.names=NULL)
 
         seg1.mat <-
           small.bins[small.chromEnd <= seg1.chromEnd,
