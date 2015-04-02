@@ -126,6 +126,7 @@ multiSampleSegHeuristic <- structure(function
   ## plot microbenchmark time versus parameter.
   data(H3K4me3.TDH.immune.chunk12.cluster4)
   many <- H3K4me3.TDH.immune.chunk12.cluster4
+  optimal <- c(27998215, 27999159)
   optimal.seconds <- system.time({
     optimal <- multiSampleSegOptimal(many)
   })[["elapsed"]]
@@ -168,6 +169,9 @@ multiSampleSegHeuristic <- structure(function
               data=optimal.timing)+
     geom_point(aes(as.numeric(as.character(expr)), time/1e9),
                data=data.frame(times, what="seconds"), pch=1)
+  ## The biggest observed deviation of the Heuristic result from the
+  ## optimal result is 17 bases (for bin.factor=30).
+  stopifnot(results.df$diff.bases < 20)
 
   heuristic <- subset(results.df, param=="2", select=c(chromStart, chromEnd))
   peaks <-
