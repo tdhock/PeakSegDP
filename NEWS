@@ -1,3 +1,7 @@
+2015.04.07
+
+move joint segmentation code to PeakSegJoint package.
+
 2015.04.02
 
 multiSampleSegZoom C function.
