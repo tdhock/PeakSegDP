@@ -16,7 +16,7 @@ segmentBins <- function
     bins <- 
       binSum(compressed,
              bin.chromStart=bin.chromStart,
-             bin.size=bases.per.bin,
+             bin.size=bin.size,
              n.bins=n.bins)
   })[["elapsed"]]
 
