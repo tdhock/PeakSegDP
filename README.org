@@ -1,44 +1,21 @@
-PeakSegDP
-
-This code was used to compute the state-of-the-art peak detection
-results described in the "[[https://github.com/tdhock/PeakSegDP-NIPS][PeakSeg: Peak detection via constrained optimal segmentation]]," 
-(4-page paper for NIPS 2014 workshop on machine learning in
-computational biology) and "[[https://github.com/tdhock/PeakSeg-paper][PeakSeg: constrained optimal segmentation and supervised penalty learning for peak detection in count data]]" (8-page paper)
-by Hocking TD, Rigaill G, and Bourque G.
+PeakSeg is a constrained maximum Poisson likelihood segmentation model
+described in "[[http://jmlr.org/proceedings/papers/v37/hocking15.html][PeakSeg: constrained optimal segmentation and supervised
+penalty learning for peak detection in count data]]" ([[https://github.com/tdhock/PeakSeg-paper][source]]). We
+proposed a [[file:src/cDPA.c][constrained Dynamic Programming Algorithm]] (cDPA) for
+computing a model that satisfies the PeakSeg constraints, available in
+this R package as the =PeakSegDP= function.
 
 #+BEGIN_SRC R
 install.packages("devtools")
 devtools::install_github("tdhock/PeakSegDP")
 library(PeakSegDP)
 example(PeakSegDP)
-example(largestContinuousMinimum)
-example(binSum)
-example(clusterPeaks)
 #+END_SRC
 
-** Detecting peaks in several samples over the whole genome using a qsub pipeline
-
-First, plot several data sets (in [[%20https://www.broadinstitute.org/igv/][IGV]] or on [[http://genome.ucsc.edu/cgi-bin/hgGateway][UCSC]]) and visually
-identify several regions with and without peaks, saving those labels
-to a file. [[file:inst/exampleData/manually_annotated_region_labels.txt][Example]]: there are two samples each for two cell types,
-bcell and tcell. Note about file formats: 
-- for the labels file, use only [[http://cbio.ensmp.fr/~thocking/chip-seq-chunk-db/][peakStart, peakEnd, noPeaks, and peaks]]
-  labels.
-- for the .bedGraph files, use [[http://bedtools.readthedocs.org/en/latest/content/tools/genomecov.html#bga-reporting-genome-coverage-for-all-positions-in-bedgraph-format][coverageBed -bga]] to get a file that has
-  lines for 0 aligned read coverage.
-
-Then, put that label file in the same directory as several
-subdirectories that have names that match the labels file. [[file:inst/exampleData/][Example]]:
-the tcell subdirectory contains two bedGraph files, and the bcell
-subdirectory contains two bedGraph files.
-
-Then, download and run the pipeline R script, which requires a cluster
-with qsub.
-
-#+BEGIN_SRC shell
-wget https://raw.githubusercontent.com/tdhock/PeakSegDP/master/exec/00_AllSteps_qsub.R
-## Edit to reflect your cluster configuration!
-Rscript 00_AllSteps_qsub.R path/to/labels.txt
-#+END_SRC
-
-Otherwise, run the [[file:exec/][steps]] individually.
+Notes: 
+- As explained in Section 4.3 of the paper, the cDPA is a heuristic
+  that is not guaranteed to find the global optimum (an algorithm that
+  provably recovers the PeakSeg model would make for an interesting
+  future research paper).
+- For supervised peak detection in ChIP-seq data sets with several
+  samples, see our newer method, [[https://github.com/tdhock/PeakSegJoint][PeakSegJoint]].
