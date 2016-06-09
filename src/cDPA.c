@@ -43,7 +43,7 @@ void cDPA
   // compute cost and mean for next step
   if(SommeSeq != 0){
     // chech what it does when Somme = 0.
-    CostSeg0toi = - SommeSeq * (log(SommeSeq) - log(SommeWei)); 
+    CostSeg0toi = SommeSeq * (1 - log(SommeSeq) + log(SommeWei)); 
   } else {
     CostSeg0toi = 0;
   }
@@ -63,7 +63,7 @@ void cDPA
     // compute cost and mean for next step.
     if(SommeSeq != 0){
       // chech what it does when Somme = 0.
-      CostSeg0toi = - SommeSeq * (log(SommeSeq) - log(SommeWei)); 
+      CostSeg0toi = SommeSeq * (1 - log(SommeSeq) + log(SommeWei)); 
     } else {
       CostSeg0toi = 0;
     }
@@ -103,7 +103,7 @@ void cDPA
       // and the only term that depends on the mean is
       // (\sum_{j=1}^d w_j x_j)(-\log\hat m),
       // which is what is coded below.
-      CostSegitoj = - SommeSeq * (log(SommeSeq) - log(SommeWei)); 
+      CostSegitoj = SommeSeq * (1 - log(SommeSeq) + log(SommeWei)); 
     } else {
       CostSegitoj = 0;
     }
@@ -139,7 +139,7 @@ void cDPA
       SommeWei= SommeWei + weights[j];
       if(SommeSeq != 0){
 	// chech what it does when Somme = 0
-	CostSegitoj = - SommeSeq * (log(SommeSeq) - log(SommeWei)); 
+	CostSegitoj = SommeSeq * (1 - log(SommeSeq) + log(SommeWei)); 
       } else {
 	CostSegitoj = 0;
       }
