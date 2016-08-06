@@ -51,7 +51,7 @@ void cDPA
       int prev_i = (seg_i-1)*n_data + seg_start-1;
       double prev_mean = mean_mat[prev_i];
       double prev_cost = cost_mat[prev_i];
-      for(int seg_end=seg_i; seg_end<n_data; seg_end++){
+      for(int seg_end=seg_start; seg_end<n_data; seg_end++){
 	SommeSeq += weights[seg_end]*sequence[seg_end];
 	SommeWei += weights[seg_end];
 	double seg_mean = SommeSeq/SommeWei;
@@ -65,13 +65,13 @@ void cDPA
 	}
 	if(mean_feasible){ 
 	  double seg_cost = PoissonLoss(SommeSeq, SommeWei);
-	  double candidate_cost = seg_cost + prev_cost;
-	  /* printf("I= %d, K=%d, J=%d\n", i, k, j); */
+	  /* printf("segs=%d, start=%d, end=%d\n", seg_i, seg_start, seg_end); */
 	  /* printf("prev mean=%f cost=%f\n", prev_mean, prev_cost); */
-	  /* printf("[i:j]mean=%f cost=%f\n", MeanSegitoj, CostSegitoj); */
+	  /* printf("this mean=%f cost=%f\n", seg_mean, seg_cost); */
 	  int this_i = n_data*seg_i + seg_end;
 	  double best_cost_so_far = cost_mat[this_i];
-	  //printf("best=%f, candidate=%f\n", best_cost_so_far, coutTraj);
+	  double candidate_cost = seg_cost + prev_cost;
+	  //printf("best=%f, candidate=%f\n", best_cost_so_far, candidate_cost);
 	  if(candidate_cost < best_cost_so_far){
 	    cost_mat[this_i] = candidate_cost;
 	    mean_mat[this_i] = seg_mean;
