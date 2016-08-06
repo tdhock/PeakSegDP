@@ -1,8 +1,8 @@
 2016.08.06
 
-cDPA C code computes total Poisson loss which is consistent with the
-PoissonLoss R function, and with other packages (Segmentor3IsBack,
-coseg).
+cDPA C code now computes total Poisson loss which is consistent with
+the PoissonLoss R function, and with other packages (Segmentor3IsBack,
+coseg). It has been significantly cleaned up (duplication removed).
 
 2015.04.07
 
