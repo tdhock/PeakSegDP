@@ -65,8 +65,9 @@ ggplot()+
   theme_bw()+
   theme(panel.margin=grid::unit(0, "cm"))+
   facet_grid(peaks ~ ., scales="free", labeller=function(var, val){
-    s <- ifelse(val==1, "", "s")
-    paste0(val, " peak", s)
+    s <- ifelse(df$peaks==1, "", "s")
+    df$peaks <- paste0(df$peaks, " peak", s)
+    df
   })  
 rownames(all.error) <- all.error$peaks
 exact.df$errors <-
