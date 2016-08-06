@@ -32,7 +32,7 @@ ggplot()+
                size=3, color="deepskyblue")+
   theme_bw()+
   theme(panel.margin=grid::unit(0, "cm"))+
-  facet_grid(peaks ~ ., scales="free", labeller=function(var, val){
+  facet_grid(peaks ~ ., scales="free", labeller=function(df){
     s <- ifelse(df$peaks==1, "", "s")
     df$peaks <- paste0(df$peaks, " peak", s)
     df
