@@ -10,3 +10,4 @@ Description: A dynamic programming algorithm can be used to compute the
  alternate: up, down, up, down, ...
 Suggests: ggplot2, testthat, proto, PeakError, microbenchmark
 Depends: R (>= 2.10)
+Remotes: tdhock/PeakError
