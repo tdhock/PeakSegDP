@@ -1,5 +1,7 @@
 2016.08.06
 
+Suggest ggplot2 >= 2.0, new geom_tallrect implementation.
+
 cDPA C code now computes total Poisson loss which is consistent with
 the PoissonLoss R function, and with other packages (Segmentor3IsBack,
 coseg). It has been significantly cleaned up (duplication removed).
