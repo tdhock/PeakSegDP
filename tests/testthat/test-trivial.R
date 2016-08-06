@@ -26,17 +26,27 @@ test_that("infeasible models", {
 })
 
 test_that("feasible models", {
+  ends <- pseg3(1, 3, 2)
+  expect_equal(ends, 1:3)
   ends <- pseg3(1, 5, 2)
   expect_equal(ends, 1:3)
   ends <- pseg3(2, 3, 1)
   expect_equal(ends, 1:3)
 })
 
-## A real solver for the Peaks problem would be able to pass this
-## test. The DP solver in this package constraints too much, so it
-## does not pass.
+test_that("solver cost same as PoissonLoss", {
+  x <- c(1, 5, 2)
+  fit <- cDPA(x, maxSegments=3)
+  mean1.vec <- cumsum(x)/seq_along(x)
+  expect_equal(fit$mean[1,], mean1.vec)
+  loss1 <- PoissonLoss(x, mean1.vec[3])
+  expect_equal(fit$loss[1,3], loss1)
+  mean2.vec <- cumsum(x[-1])/1:2
+  expect_equal(fit$mean[2,2:3], mean2.vec)
+  loss2 <- PoissonLoss(x, c(1, 3.5, 3.5))
+  expect_equal(fit$loss[2,3], loss2)
+  expect_equal(fit$mean[3,3], 2)
+  loss3 <- PoissonLoss(x, x)
+  expect_equal(fit$loss[3,3], loss3)
+})
 
-## test_that("feasible model 4 data points", {
-##   ends <- pseg3(97, 101, 104, 103)
-##   expect_equal(ends, c(2, 3, 4))
-## })
