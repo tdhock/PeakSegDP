@@ -50,3 +50,17 @@ test_that("solver cost same as PoissonLoss", {
   expect_equal(fit$loss[3,3], loss3)
 })
 
+test_that("no feasible model for paper data set, forward", {
+  expect_error({
+    pseg3(1, 10, 14, 13)
+  }, "no feasible model with 3 segments")
+})
+
+test_that("sub-optimal model for paper data set, reverse", {
+  count.vec <- c(13, 14, 10, 1)
+  fit <- cDPA(count.vec, maxSegments=3L)
+  cdpa.loss <- fit$loss[3,4]
+  mean.vec <- c(11, 12, 12, 1)
+  other.loss <- PoissonLoss(count.vec, mean.vec)
+  expect_gt(cdpa.loss, other.loss)
+})
