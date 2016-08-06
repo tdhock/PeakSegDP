@@ -1,3 +1,5 @@
+library(testthat)
+library(PeakSegDP)
 context("trivial examples")
 
 pseg3 <- function(...){
@@ -24,7 +26,7 @@ test_that("infeasible models", {
 })
 
 test_that("feasible models", {
-  ends <- pseg3(1, 3, 2)
+  ends <- pseg3(1, 5, 2)
   expect_equal(ends, 1:3)
   ends <- pseg3(2, 3, 1)
   expect_equal(ends, 1:3)

@@ -1,3 +1,5 @@
+/* -*- compile-command: "R CMD INSTALL .." -*- */
+
 #include <R.h>
 #include <Rinternals.h>
 #include "math.h"
@@ -9,169 +11,76 @@
 // For the Poisson in the stand DP version we only to consider 
 // the \sum x_i ln(lambda) [at the max likelihood \sum_i \hat{\lambda_i} = \sum x_i
 
+double PoissonLoss(double xw, double w){
+  // compute cost and mean for next step.
+  if(xw != 0){
+    return xw * (1 - log(xw) + log(w)); 
+  } else {
+    return 0;
+  }
+}
+
 void cDPA
 (int *sequence, int *weights, 
  int *lgSeq, int *nStep, 
  double *cost_mat, int *end_mat, double *mean_mat
   ){
-  /* Lecture des données */
-  /* On stocke les données comme un liste de vecteurs */
-  //printf("ligne 11\n");
-	
-  char c = 13;
-  //gsl_matrix_view matResult1 = gsl_matrix_view_array(cost_mat, *nStep, *lgSeq);
-  int i, j, k, l;
-  i=0;
-  while(i < *lgSeq-1){ 
-    k=0;
-    while(k < *nStep){
-      cost_mat[(*lgSeq)*k+i] = INFINITY;
-      mean_mat[(*lgSeq)*k+i] = INFINITY;
-      k++;
-    }
-    i++;	
+  int n_data = *lgSeq;
+  int max_segments = *nStep;
+  for(int i=0; i<n_data*max_segments; i++){ 
+    cost_mat[i] = INFINITY;
+    mean_mat[i] = INFINITY;
   }
-	
   /* 	STRT INITIALISATION 	   */
-
-  double SommeSeq, SommeWei, CostSeg0toi, MeanSeg0toi;
-
-  // update Somme and SommeWei
-  SommeSeq=weights[0]*sequence[0];
-  SommeWei= weights[0];
-	
-  // compute cost and mean for next step
-  if(SommeSeq != 0){
-    // chech what it does when Somme = 0.
-    CostSeg0toi = SommeSeq * (1 - log(SommeSeq) + log(SommeWei)); 
-  } else {
-    CostSeg0toi = 0;
-  }
-  MeanSeg0toi = SommeSeq/SommeWei;
-	
-  i=0;
-  while(i < *lgSeq-1){
-    //fprintf(stderr, "Boucle ligne 31 : %d \n", i);
-    cost_mat[i] = CostSeg0toi;
-    mean_mat[i] = MeanSeg0toi;
+  double SommeSeq=0.0, SommeWei=0.0, CostSeg0toi;
+  for(int i=0; i<n_data; i++){
+    SommeSeq += weights[i]*sequence[i];
+    SommeWei += weights[i];
+    cost_mat[i] = PoissonLoss(SommeSeq, SommeWei);
+    mean_mat[i] = SommeSeq/SommeWei;
     end_mat[i] = 0;
-		
-    // update Somme and SommeWei.
-    SommeSeq = SommeSeq + weights[i+1]*sequence[i+1];
-    SommeWei= SommeWei + weights[i+1];
-		
-    // compute cost and mean for next step.
-    if(SommeSeq != 0){
-      // chech what it does when Somme = 0.
-      CostSeg0toi = SommeSeq * (1 - log(SommeSeq) + log(SommeWei)); 
-    } else {
-      CostSeg0toi = 0;
-    }
-    MeanSeg0toi = SommeSeq/SommeWei;
-
-    i++;
   }
-  cost_mat[i] = CostSeg0toi;
-  mean_mat[i] = MeanSeg0toi;
-  end_mat[i] = 0;
-	
   /* 	END INITIALISATION 	   */
 
   /* 	CONSIDER ALL SEG 	   */
-	
-  int minim;
-  double coutTraj, CostSegitoj, MeanSegitoj;
-  i=1;
-  /* i : point de depart, j arrivée, k nombre de pas*/
-  while(i < *lgSeq){
-    //fprintf(stderr, "%c Node :   %d  / %d  ", c, i, *lgSeq);
-    if( i+1 <= *nStep){ minim=i+1; } 
-    else{ minim=*nStep; }
-    //printf("Sommet %d et Mini %d\n", i, minim);
-
-		
-    SommeSeq=weights[i]*sequence[i];
-    SommeWei= weights[i];
-
-    if(SommeSeq != 0){
-      // The formula for the optimal Poisson loss 
-      // for 1 segment with d integer 
-      // data points x_j and weights w_j is
-      // \sum_{j=1}^d w_j m_j - w_j x_j \log m_j =
-      //   ( \sum_{j=1}^d w_j x_j ) (1-\log \hat m)
-      // where the segment mean \hat m = (\sum w_j x_j)/(\sum w_j),
-      // and the only term that depends on the mean is
-      // (\sum_{j=1}^d w_j x_j)(-\log\hat m),
-      // which is what is coded below.
-      CostSegitoj = SommeSeq * (1 - log(SommeSeq) + log(SommeWei)); 
-    } else {
-      CostSegitoj = 0;
-    }
-    MeanSegitoj = SommeSeq/SommeWei;
-
-    j=i+1;
-    while(j < *lgSeq){
-			
-      k=1;
-      R_CheckUserInterrupt();
-
-      while(k < minim){
-	if( ( (k%2 == 1) & 
-	      ( MeanSegitoj  - mean_mat[(*lgSeq)*(k-1)+i-1]  > 0)) | 
-	    ((k%2 == 0) & 
-	     ( MeanSegitoj  - mean_mat[(*lgSeq)*(k-1)+i-1]  < 0)) ){ 
-				
-	  coutTraj = CostSegitoj + cost_mat[(*lgSeq)*(k-1)+i-1];
-	  //printf("I= %d, K=%d, J=%d, Poids: %f, %f, Means=%f - %f \n", i, k, j, CostSegitoj, coutTraj, MeanSegitoj, gsl_matrix_get(&matConstraint.matrix, k-1, i-1));
-	  //printf("I= %d, K=%d, J=%d, Poids: %f, %f\n", i, k, j, Poids, coutTraj);
-	  if(  coutTraj  < cost_mat[(*lgSeq)*k+j-1]   ){
-	    cost_mat[(*lgSeq)*k+j-1] = coutTraj;
-	    mean_mat[(*lgSeq)*k+j-1] = MeanSegitoj;
-	    end_mat[(*lgSeq)*k+j-1] = i;
+  for(int seg_i=1; seg_i<max_segments; seg_i++){
+    for(int seg_start=seg_i; seg_start<n_data; seg_start++){
+      // compute cost of models with a break before seg_start.
+      SommeSeq = 0.0;
+      SommeWei = 0.0;
+      int prev_i = (seg_i-1)*n_data + seg_start-1;
+      double prev_mean = mean_mat[prev_i];
+      double prev_cost = cost_mat[prev_i];
+      for(int seg_end=seg_i; seg_end<n_data; seg_end++){
+	SommeSeq += weights[seg_end]*sequence[seg_end];
+	SommeWei += weights[seg_end];
+	double seg_mean = SommeSeq/SommeWei;
+	int mean_feasible;
+	if(seg_i % 2){
+	  //odd-numbered segment. 3, 5, ...
+	  mean_feasible = prev_mean < seg_mean;
+	}else{
+	  //even-numbered segment. 2, 4, ...
+	  mean_feasible = prev_mean > seg_mean;
+	}
+	if(mean_feasible){ 
+	  double seg_cost = PoissonLoss(SommeSeq, SommeWei);
+	  double candidate_cost = seg_cost + prev_cost;
+	  /* printf("I= %d, K=%d, J=%d\n", i, k, j); */
+	  /* printf("prev mean=%f cost=%f\n", prev_mean, prev_cost); */
+	  /* printf("[i:j]mean=%f cost=%f\n", MeanSegitoj, CostSegitoj); */
+	  int this_i = n_data*seg_i + seg_end;
+	  double best_cost_so_far = cost_mat[this_i];
+	  //printf("best=%f, candidate=%f\n", best_cost_so_far, coutTraj);
+	  if(candidate_cost < best_cost_so_far){
+	    cost_mat[this_i] = candidate_cost;
+	    mean_mat[this_i] = seg_mean;
+	    end_mat[this_i] = seg_start;
 	  }
-	  //} else {
-	  //printf("Not- I= %d, K=%d, J=%d, Poids: %f, %f, Means=%f - %f\n", i, k, j, CostSegitoj, coutTraj, MeanSegitoj, gsl_matrix_get(&matConstraint.matrix, k-1, i-1));
 	}
-	k++;
-      }
-		
-      SommeSeq = SommeSeq + weights[j]*sequence[j];
-      SommeWei= SommeWei + weights[j];
-      if(SommeSeq != 0){
-	// chech what it does when Somme = 0
-	CostSegitoj = SommeSeq * (1 - log(SommeSeq) + log(SommeWei)); 
-      } else {
-	CostSegitoj = 0;
-      }
-      MeanSegitoj = SommeSeq/SommeWei;
-
-				
-      j++;
-    }
-		
-    // last point //
-    k=1;
-    while(k < minim){
-      if( ( (k%2 == 1) & ( MeanSegitoj  - mean_mat[(*lgSeq)*(k-1)+i-1]  > 0)) | ((k%2 == 0) & ( MeanSegitoj  - mean_mat[(*lgSeq)*(k-1)+i-1]  < 0)) ){ 
-				
-	coutTraj = CostSegitoj + cost_mat[(*lgSeq)*(k-1)+i-1];
-	//printf("I= %d, K=%d, J=%d, Poids: %f, %f, Means=%f - %f \n", i, k, j, CostSegitoj, coutTraj, MeanSegitoj, gsl_matrix_get(&matConstraint.matrix, k-1, i-1) );
-	//printf("I= %d, K=%d, J=%d, Poids: %f, %f\n", i, k, j, Poids, coutTraj);
-	if(  coutTraj  < cost_mat[(*lgSeq)*k+j-1]  ){
-	  cost_mat[(*lgSeq)*k+j-1] = coutTraj;
-	  mean_mat[(*lgSeq)*k+j-1] = MeanSegitoj;
-	  end_mat[(*lgSeq)*k+j-1] = i;
-	}
-	//} else {
-	//	printf("Not- I= %d, K=%d, J=%d, Poids: %f, %f, Means=%f - %f \n", i, k, j, CostSegitoj, coutTraj, MeanSegitoj, gsl_matrix_get(&matConstraint.matrix, k-1, i-1));
-      }
-      k++;
-    }
-		
-    i++;
-  }
-  //printf("\n End of Dynamic Programming\n");
-  
+      }//seg_end
+    }//seg_start
+  }//seg_i
 }
 
 
