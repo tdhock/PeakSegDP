@@ -8,6 +8,6 @@ Description: A dynamic programming algorithm can be used to compute the
  best segmentation with respect to the Poisson likelihood, subject
  to a constraint on the number of segments, and the changes which must
  alternate: up, down, up, down, ...
-Suggests: ggplot2, testthat, proto, PeakError, microbenchmark
+Suggests: ggplot2 (>= 2.0), testthat, proto, PeakError, microbenchmark
 Depends: R (>= 2.10)
 Remotes: tdhock/PeakError
