@@ -3,7 +3,8 @@
 \title{chromProblems}
 \description{Divide a chromosome into a set of overlapping segmentation
 problems.}
-\usage{chromProblems(chrom, first.chromStart, last.chromEnd, bases.per.problem)}
+\usage{chromProblems(chrom, first.chromStart, last.chromEnd, 
+    bases.per.problem)}
 \arguments{
   \item{chrom}{character chromosome name.}
   \item{first.chromStart}{Base before the first base on this chromosome.}
