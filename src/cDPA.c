@@ -32,7 +32,7 @@ void cDPA
     mean_mat[i] = INFINITY;
   }
   /* 	STRT INITIALISATION 	   */
-  double SommeSeq=0.0, SommeWei=0.0, CostSeg0toi;
+  double SommeSeq=0.0, SommeWei=0.0;
   for(int i=0; i<n_data; i++){
     SommeSeq += weights[i]*sequence[i];
     SommeWei += weights[i];
