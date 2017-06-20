@@ -1,5 +1,4 @@
 | [[file:tests/testthat][tests]]    | [[https://travis-ci.org/tdhock/PeakSegDP][https://travis-ci.org/tdhock/PeakSegDP.png?branch=master]]             |
-| [[https://github.com/jimhester/covr][coverage]] | [[https://codecov.io/gh/tdhock/PeakSegDP][https://codecov.io/gh/tdhock/PeakSegDP/branch/master/graph/badge.svg]] |
 
 PeakSeg is a constrained maximum Poisson likelihood segmentation model
 described in "[[http://jmlr.org/proceedings/papers/v37/hocking15.html][PeakSeg: constrained optimal segmentation and supervised
