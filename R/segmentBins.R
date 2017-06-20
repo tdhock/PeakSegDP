@@ -55,14 +55,15 @@ segmentBins <- function
 
   all.loss <- data.frame(fit$error)
   all.loss$cummin <- cummin(all.loss$error)
-  loss <- subset(all.loss, error == cummin)
+  is.dec <- all.loss$error == all.loss$cummin
+  loss <- all.loss[is.dec,]
   rownames(loss) <- loss$segments
   bases <- with(fit$segments[1,], chromEnd-chromStart)
   in.sqrt <- 1.1 + log(bases / loss$segments)
   in.square <- 1 + 4 * sqrt(in.sqrt)
   complexity <- in.square * in.square * loss$segments
   
-  exact <- with(loss, exactModelSelection(error, complexity, peaks))
+  exact <- penaltyLearning::modelSelection(loss, "error")
 
   list(features=features, bins=bins, modelSelection=exact, fit=fit,
        binSum.seconds=binSum.seconds, cDPA.seconds=cDPA.seconds)

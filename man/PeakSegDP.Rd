@@ -17,8 +17,9 @@ reads.}
 
 
 \examples{
-data(chr11ChIPseq)
-one <- subset(chr11ChIPseq$coverage, sample.id=="McGill0002")
+library(PeakSegDP)
+data(chr11ChIPseq, envir=environment())
+one <- subset(chr11ChIPseq$coverage, sample.id=="McGill0002")[10000:12000,]
 fit <- PeakSegDP(one, 3L)
 library(ggplot2)
 ggplot()+

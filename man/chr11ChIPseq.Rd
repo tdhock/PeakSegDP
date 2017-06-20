@@ -35,7 +35,7 @@ ann.colors <-
 ggplot()+
   scale_fill_manual("annotation", values=ann.colors,
                     breaks=names(ann.colors))+
-  geom_tallrect(aes(xmin=chromStart/1e3, xmax=chromEnd/1e3,
+  penaltyLearning::geom_tallrect(aes(xmin=chromStart/1e3, xmax=chromEnd/1e3,
                     fill=annotation),
                 data=chr11ChIPseq$regions, alpha=1/2)+
   theme_bw()+
