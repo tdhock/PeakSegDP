@@ -1,13 +1,20 @@
 Package: PeakSegDP
-Maintainer: Toby Dylan Hocking <toby.hocking@mail.mcgill.ca>
+Maintainer: Toby Dylan Hocking <toby.hocking@r-project.org>
 Author: Toby Dylan Hocking, Guillem Rigaill
-Version: 2016.08.06
+Version: 2017.06.20
 License: GPL-3
-Title: Peak detection via constrained optimal Segmentation
-Description: A dynamic programming algorithm can be used to compute the
- best segmentation with respect to the Poisson likelihood, subject
+Title: Dynamic Programming Algorithm for Peak Detection in ChIP-Seq Data
+Description: A quadratic time dynamic programming algorithm
+ can be used to compute an approximate solution to the problem of
+ finding the most likely changepoints
+ with respect to the Poisson likelihood, subject
  to a constraint on the number of segments, and the changes which must
- alternate: up, down, up, down, ...
-Suggests: ggplot2 (>= 2.0), testthat, proto, PeakError, microbenchmark
+ alternate: up, down, up, down, etc. For more info read
+ <http://proceedings.mlr.press/v37/hocking15.html>
+ "PeakSeg: constrained optimal segmentation and supervised penalty learning
+ for peak detection in count data" by TD Hocking et al,
+ proceedings of ICML2015.
+Suggests: ggplot2 (>= 2.0), testthat, 
+ penaltyLearning
 Depends: R (>= 2.10)
-Remotes: tdhock/PeakError
+

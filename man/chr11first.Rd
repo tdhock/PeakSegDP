@@ -46,7 +46,7 @@ one.sample.regions <- subset(chr11ChIPseq$regions, sample.id==one.sample)
 ggplot()+
   scale_fill_manual("annotation", values=ann.colors,
                     breaks=names(ann.colors))+
-  geom_tallrect(aes(xmin=chromStart/1e3, xmax=chromEnd/1e3,
+  penaltyLearning::geom_tallrect(aes(xmin=chromStart/1e3, xmax=chromEnd/1e3,
                     fill=annotation),
                 data=one.sample.regions, alpha=1/2)+
   theme_bw()+
