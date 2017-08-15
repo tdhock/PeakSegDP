@@ -1,6 +1,8 @@
 2017.08.15
 
-package -> PACKAGE in binSum
+remove binSum.
+
+add cDPA_interface.
 
 2017.06.20
 
