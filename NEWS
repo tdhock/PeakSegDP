@@ -1,3 +1,7 @@
+2017.08.15
+
+package -> PACKAGE in binSum
+
 2017.06.20
 
 depend on penaltyLearning, delete related code in this pkg.
