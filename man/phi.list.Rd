@@ -3,7 +3,7 @@
 \docType{data}
 \title{phi list}
 \description{List of functions, each a phi loss.}
-\usage{"phi.list"}
+\usage{phi.list}
 
 
 
