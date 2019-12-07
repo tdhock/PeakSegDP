@@ -41,8 +41,8 @@ devtools::install_github("tdhock/PeakSegDP")
 
 There are two main functions for computing the constrained segmentation model:
 
-- [cDPA](file:R/cDPA.R) is a low-level interface to [the C solver](file:src/cDPA.c). Its inputs are N weighted data points and S, the maximum number of segments. It outputs a list with components named =loss=, =ends=, and =mean= (S x N matrices describing the solution).
-- [PeakSegDP](file:R/PeakSegDP.R) is a more user-friendly wrapper of the cDPA. Its input parameter is P, the maximum number of peaks, which implies S = P*2+1. Its input data type is a data.frame with columns =count=, =chromStart=, =chromEnd=. It outputs a list of data.frames, =peaks=, =error=, =segments=, =breaks=.
+- [cDPA](file:R/cDPA.R) is a low-level interface to [the C solver](file:src/cDPA.c). Its inputs are N weighted data points and S, the maximum number of segments. It outputs a list with components named `loss`, `ends`, and `mean` (S x N matrices describing the solution).
+- [PeakSegDP](file:R/PeakSegDP.R) is a more user-friendly wrapper of the cDPA. Its input parameter is P, the maximum number of peaks, which implies S = P*2+1. Its input data type is a data.frame with columns `count`, `chromStart`, `chromEnd`. It outputs a list of data.frames, `peaks`, `error`, `segments`, `breaks`.
 
 ## Example
 
