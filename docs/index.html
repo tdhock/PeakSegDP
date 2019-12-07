@@ -89,9 +89,9 @@
 <p>There are two main functions for computing the constrained segmentation model:</p>
 <ul>
 <li>
-<a href="file:R/cDPA.R">cDPA</a> is a low-level interface to <a href="file:src/cDPA.c">the C solver</a>. Its inputs are N weighted data points and S, the maximum number of segments. It outputs a list with components named =loss=, =ends=, and =mean= (S x N matrices describing the solution).</li>
+<a href="file:R/cDPA.R">cDPA</a> is a low-level interface to <a href="file:src/cDPA.c">the C solver</a>. Its inputs are N weighted data points and S, the maximum number of segments. It outputs a list with components named <code>loss</code>, <code>ends</code>, and <code>mean</code> (S x N matrices describing the solution).</li>
 <li>
-<a href="file:R/PeakSegDP.R">PeakSegDP</a> is a more user-friendly wrapper of the cDPA. Its input parameter is P, the maximum number of peaks, which implies S = P*2+1. Its input data type is a data.frame with columns =count=, =chromStart=, =chromEnd=. It outputs a list of data.frames, =peaks=, =error=, =segments=, =breaks=.</li>
+<a href="file:R/PeakSegDP.R">PeakSegDP</a> is a more user-friendly wrapper of the cDPA. Its input parameter is P, the maximum number of peaks, which implies S = P*2+1. Its input data type is a data.frame with columns <code>count</code>, <code>chromStart</code>, <code>chromEnd</code>. It outputs a list of data.frames, <code>peaks</code>, <code>error</code>, <code>segments</code>, <code>breaks</code>.</li>
 </ul>
 </div>
 <div id="example" class="section level2">
