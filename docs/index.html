@@ -68,16 +68,69 @@
 
       </header><div class="row">
   <div class="contents col-md-9">
-A quadratic time dynamic programming algorithm
- can be used to compute an approximate solution to the problem of
- finding the most likely changepoints
- with respect to the Poisson likelihood, subject
- to a constraint on the number of segments, and the changes which must
- alternate: up, down, up, down, etc. For more info read
- &lt;<a href="http://proceedings.mlr.press/v37/hocking15.html">http://proceedings.mlr.press/v37/hocking15.html</a>&gt;
- "PeakSeg: constrained optimal segmentation and supervised penalty learning
- for peak detection in count data" by TD Hocking et al,
- proceedings of ICML2015.
+<div id="peaksegdp" class="section level1">
+<div class="page-header"><h1 class="hasAnchor">
+<a href="#peaksegdp" class="anchor"></a>PeakSegDP</h1></div>
+<!-- badges: start -->
+<!-- badges: end -->
+<p>PeakSeg is a constrained maximum Poisson likelihood segmentation model. This is described in <a href="http://jmlr.org/proceedings/papers/v37/hocking15.html">PeakSeg: constrained optimal segmentation and supervised penalty learning for peak detection in count data</a> (<a href="https://github.com/tdhock/PeakSeg-paper">source</a>). We proposed a <a href="file:src/cDPA.c">constrained Dynamic Programming Algorithm</a> (cDPA) for computing a model that satisfies the PeakSeg constraints.</p>
+<div id="installation" class="section level2">
+<h2 class="hasAnchor">
+<a href="#installation" class="anchor"></a>Installation</h2>
+<p>You can install the released version of PeakSegDP from <a href="https://CRAN.R-project.org">CRAN</a> with:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb1-1" data-line-number="1"><span class="kw"><a href="https://rdrr.io/r/utils/install.packages.html">install.packages</a></span>(<span class="st">"PeakSegDP"</span>)</a></code></pre></div>
+<p>And the development version from <a href="https://github.com/">GitHub</a> with:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb2-1" data-line-number="1"><span class="co"># install.packages("devtools")</span></a>
+<a class="sourceLine" id="cb2-2" data-line-number="2">devtools<span class="op">::</span><span class="kw"><a href="https://rdrr.io/pkg/devtools/man/remote-reexports.html">install_github</a></span>(<span class="st">"tdhock/PeakSegDP"</span>)</a></code></pre></div>
+</div>
+<div id="usage" class="section level2">
+<h2 class="hasAnchor">
+<a href="#usage" class="anchor"></a>Usage</h2>
+<p>There are two main functions for computing the constrained segmentation model:</p>
+<ul>
+<li>
+<a href="file:R/cDPA.R">cDPA</a> is a low-level interface to <a href="file:src/cDPA.c">the C solver</a>. Its inputs are N weighted data points and S, the maximum number of segments. It outputs a list with components named =loss=, =ends=, and =mean= (S x N matrices describing the solution).</li>
+<li>
+<a href="file:R/PeakSegDP.R">PeakSegDP</a> is a more user-friendly wrapper of the cDPA. Its input parameter is P, the maximum number of peaks, which implies S = P*2+1. Its input data type is a data.frame with columns =count=, =chromStart=, =chromEnd=. It outputs a list of data.frames, =peaks=, =error=, =segments=, =breaks=.</li>
+</ul>
+</div>
+<div id="example" class="section level2">
+<h2 class="hasAnchor">
+<a href="#example" class="anchor"></a>Example</h2>
+<p>This is an example plotting the fitting of PeakSegDP():</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb3-1" data-line-number="1"><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span>(PeakSegDP)</a>
+<a class="sourceLine" id="cb3-2" data-line-number="2"><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span>(ggplot2)</a>
+<a class="sourceLine" id="cb3-3" data-line-number="3"><span class="kw"><a href="https://rdrr.io/r/utils/data.html">data</a></span>(chr11ChIPseq, <span class="dt">envir=</span><span class="kw"><a href="https://rdrr.io/r/base/environment.html">environment</a></span>())</a>
+<a class="sourceLine" id="cb3-4" data-line-number="4">one &lt;-<span class="st"> </span><span class="kw"><a href="https://rdrr.io/r/base/subset.html">subset</a></span>(chr11ChIPseq<span class="op">$</span>coverage, sample.id<span class="op">==</span><span class="st">"McGill0002"</span>)[<span class="dv">10000</span><span class="op">:</span><span class="dv">12000</span>,]</a>
+<a class="sourceLine" id="cb3-5" data-line-number="5">fit &lt;-<span class="st"> </span><span class="kw"><a href="reference/PeakSegDP.html">PeakSegDP</a></span>(one, 3L)</a>
+<a class="sourceLine" id="cb3-6" data-line-number="6"></a>
+<a class="sourceLine" id="cb3-7" data-line-number="7"><span class="kw"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html">ggplot</a></span>()<span class="op">+</span></a>
+<a class="sourceLine" id="cb3-8" data-line-number="8"><span class="st">  </span><span class="kw"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html">geom_step</a></span>(<span class="kw"><a href="https://ggplot2.tidyverse.org/reference/aes.html">aes</a></span>(chromStart<span class="op">/</span><span class="fl">1e3</span>, count), <span class="dt">data=</span>one)<span class="op">+</span></a>
+<a class="sourceLine" id="cb3-9" data-line-number="9"><span class="st">  </span><span class="kw"><a href="https://ggplot2.tidyverse.org/reference/geom_segment.html">geom_segment</a></span>(<span class="kw"><a href="https://ggplot2.tidyverse.org/reference/aes.html">aes</a></span>(chromStart<span class="op">/</span><span class="fl">1e3</span>, mean,</a>
+<a class="sourceLine" id="cb3-10" data-line-number="10">                   <span class="dt">xend=</span>chromEnd<span class="op">/</span><span class="fl">1e3</span>, <span class="dt">yend=</span>mean),</a>
+<a class="sourceLine" id="cb3-11" data-line-number="11">               <span class="dt">data=</span>fit<span class="op">$</span>segments, <span class="dt">color=</span><span class="st">"green"</span>)<span class="op">+</span></a>
+<a class="sourceLine" id="cb3-12" data-line-number="12"><span class="st">  </span><span class="kw"><a href="https://ggplot2.tidyverse.org/reference/geom_segment.html">geom_segment</a></span>(<span class="kw"><a href="https://ggplot2.tidyverse.org/reference/aes.html">aes</a></span>(chromStart<span class="op">/</span><span class="fl">1e3</span>, <span class="dv">0</span>,</a>
+<a class="sourceLine" id="cb3-13" data-line-number="13">                   <span class="dt">xend=</span>chromEnd<span class="op">/</span><span class="fl">1e3</span>, <span class="dt">yend=</span><span class="dv">0</span>),</a>
+<a class="sourceLine" id="cb3-14" data-line-number="14">               <span class="dt">data=</span><span class="kw"><a href="https://rdrr.io/r/base/subset.html">subset</a></span>(fit<span class="op">$</span>segments, status<span class="op">==</span><span class="st">"peak"</span>),</a>
+<a class="sourceLine" id="cb3-15" data-line-number="15">               <span class="dt">size=</span><span class="dv">3</span>, <span class="dt">color=</span><span class="st">"deepskyblue"</span>)<span class="op">+</span></a>
+<a class="sourceLine" id="cb3-16" data-line-number="16"><span class="st">  </span><span class="kw"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html">theme_bw</a></span>()<span class="op">+</span></a>
+<a class="sourceLine" id="cb3-17" data-line-number="17"><span class="st">  </span><span class="kw"><a href="https://ggplot2.tidyverse.org/reference/theme.html">theme</a></span>(<span class="dt">panel.spacing=</span>grid<span class="op">::</span><span class="kw"><a href="https://rdrr.io/r/grid/unit.html">unit</a></span>(<span class="dv">0</span>, <span class="st">"cm"</span>))<span class="op">+</span></a>
+<a class="sourceLine" id="cb3-18" data-line-number="18"><span class="st">  </span><span class="kw"><a href="https://ggplot2.tidyverse.org/reference/facet_grid.html">facet_grid</a></span>(peaks <span class="op">~</span><span class="st"> </span>., <span class="dt">scales=</span><span class="st">"free"</span>, <span class="dt">labeller=</span><span class="cf">function</span>(df){</a>
+<a class="sourceLine" id="cb3-19" data-line-number="19">    s &lt;-<span class="st"> </span><span class="kw"><a href="https://rdrr.io/r/base/ifelse.html">ifelse</a></span>(df<span class="op">$</span>peaks<span class="op">==</span><span class="dv">1</span>, <span class="st">""</span>, <span class="st">"s"</span>)</a>
+<a class="sourceLine" id="cb3-20" data-line-number="20">    df<span class="op">$</span>peaks &lt;-<span class="st"> </span><span class="kw"><a href="https://rdrr.io/r/base/paste.html">paste0</a></span>(df<span class="op">$</span>peaks, <span class="st">" peak"</span>, s)</a>
+<a class="sourceLine" id="cb3-21" data-line-number="21">    df</a>
+<a class="sourceLine" id="cb3-22" data-line-number="22">  })</a></code></pre></div>
+<p><img src="reference/figures/README-unnamed-chunk-2-1.png" width="100%"></p>
+</div>
+<div id="related-work" class="section level2">
+<h2 class="hasAnchor">
+<a href="#related-work" class="anchor"></a>Related work</h2>
+<ul>
+<li>As explained in our ICML paper, the cDPA is a quadratic time algorithm that is not guaranteed to find the global optimum. For a linear time algorithm that recovers the global optimum, use the <a href="https://github.com/tdhock/coseg">coseg</a> package.</li>
+<li>For supervised peak detection in ChIP-seq data sets with several samples, see our newer method, <a href="https://github.com/tdhock/PeakSegJoint">PeakSegJoint</a>.</li>
+</ul>
+</div>
+</div>
   </div>
 
   <div class="col-md-3 hidden-xs hidden-sm" id="sidebar">
