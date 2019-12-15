@@ -17,4 +17,5 @@ Description: A quadratic time dynamic programming algorithm
 Suggests: ggplot2 (>= 2.0), testthat, 
  penaltyLearning
 Depends: R (>= 2.10)
+BUGREPORT:https://github.com/tdhock/PeakSegDP (GITHUB REPO)
 
