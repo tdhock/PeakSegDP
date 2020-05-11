@@ -4,7 +4,7 @@
 \title{calc loss from lp list}
 \description{if we have already calculated the linear predictor using
 fit$predict, this function can be useful.}
-\usage{"calc.loss.from.lp.list"}
+\usage{calc.loss.from.lp.list}
 
 
 

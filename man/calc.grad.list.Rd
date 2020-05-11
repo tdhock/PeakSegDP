@@ -3,7 +3,7 @@
 \docType{data}
 \title{calc grad list}
 \description{List of calc.grad functions: x, features, limits -> gradient.}
-\usage{"calc.grad.list"}
+\usage{calc.grad.list}
 
 
 

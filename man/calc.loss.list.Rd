@@ -4,7 +4,7 @@
 \title{calc loss list}
 \description{List of interval regression loss functions: x, feat, lim =>
 numeric.}
-\usage{"calc.loss.list"}
+\usage{calc.loss.list}
 
 
 
