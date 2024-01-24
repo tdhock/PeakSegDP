@@ -1,7 +1,7 @@
 Package: PeakSegDP
 Maintainer: Toby Dylan Hocking <toby.hocking@r-project.org>
 Author: Toby Dylan Hocking, Guillem Rigaill
-Version: 2017.08.15
+Version: 2024.1.24
 License: GPL-3
 URL: https://github.com/tdhock/PeakSegDP
 BugReports: https://github.com/tdhock/PeakSegDP/issues
